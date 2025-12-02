@@ -54,3 +54,6 @@ desktop.ini
 *.backup
 *_backup
 KompasLast_V_backup
+
+# Language files
+lang/*/myfatoorah.php
