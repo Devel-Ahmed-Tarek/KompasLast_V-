@@ -1,0 +1,21 @@
+<?php
+return [
+    'auth_disabled'     => "L'autenticazione è attualmente disabilitata",
+    'login_success'     => 'Accesso effettuato con successo',
+    'invalid_login'     => 'I dati di accesso non sono corretti',
+    'register_disabled' => "La registrazione dell'azienda è attualmente disabilitata",
+    'register_success'  => 'Azienda registrata con successo',
+    'validation_error'  => 'Errori di convalida',
+    'server_error'      => 'Errore del server',
+    'otp_sent'          => 'OTP inviato con successo',
+    'otp_invalid'       => 'OTP non valido o scaduto',
+    'otp_valid'         => 'OTP valido',
+    'password_changed'  => 'Password cambiata con successo',
+    'otp_subject'       => 'Il tuo codice OTP',
+    'hello'             => 'Ciao',
+    'otp_message'       => 'Hai richiesto la reimpostazione della password. Ecco il tuo OTP:',
+    'your_otp'          => 'Il tuo codice OTP:',
+    'otp_expiry'        => 'Questo OTP scadrà tra 10 minuti.',
+    'otp_ignore'        => 'Se non hai richiesto questo, ignora questo messaggio.',
+    'thank_you'         => 'Grazie per aver utilizzato il nostro servizio!',
+];
