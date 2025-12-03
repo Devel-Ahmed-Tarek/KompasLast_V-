@@ -19,7 +19,14 @@ class AdminQuestionOptionController extends Controller
         $question = TypeQuestion::findOrFail($question_id);
         $options = QuestionOption::where('question_id', $question_id)
             ->orderBy('order')
-            ->get();
+            ->get()
+            ->map(function ($option) {
+                // إرجاع الـ URL الكامل للصورة
+                if ($option->icon) {
+                    $option->icon = asset($option->icon);
+                }
+                return $option;
+            });
         
         return HelperFunc::sendResponse(200, 'Options retrieved successfully', $options);
     }
@@ -36,6 +43,7 @@ class AdminQuestionOptionController extends Controller
             'option_text.fr' => 'nullable|string',
             'option_text.it' => 'nullable|string',
             'option_text.ar' => 'nullable|string',
+            'icon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
             'order' => 'nullable|integer',
         ]);
 
@@ -45,11 +53,24 @@ class AdminQuestionOptionController extends Controller
 
         $question = TypeQuestion::findOrFail($question_id);
         
-        $option = QuestionOption::create([
+        $data = [
             'question_id' => $question_id,
             'option_text' => $request->option_text,
             'order' => $request->order ?? 0,
-        ]);
+        ];
+
+        // رفع الصورة/الأيقونة إذا تم إرسالها
+        if ($request->hasFile('icon')) {
+            $iconPath = HelperFunc::uploadFile('question_options', $request->file('icon'));
+            $data['icon'] = $iconPath;
+        }
+
+        $option = QuestionOption::create($data);
+
+        // إرجاع الـ URL الكامل للصورة
+        if ($option->icon) {
+            $option->icon = asset($option->icon);
+        }
 
         return HelperFunc::sendResponse(201, 'Option created successfully', $option);
     }
@@ -61,6 +82,11 @@ class AdminQuestionOptionController extends Controller
     {
         $option = QuestionOption::where('question_id', $question_id)
             ->findOrFail($id);
+        
+        // إرجاع الـ URL الكامل للصورة
+        if ($option->icon) {
+            $option->icon = asset($option->icon);
+        }
         
         return HelperFunc::sendResponse(200, 'Option retrieved successfully', $option);
     }
@@ -77,6 +103,7 @@ class AdminQuestionOptionController extends Controller
             'option_text.fr' => 'nullable|string',
             'option_text.it' => 'nullable|string',
             'option_text.ar' => 'nullable|string',
+            'icon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
             'order' => 'nullable|integer',
         ]);
 
@@ -91,8 +118,24 @@ class AdminQuestionOptionController extends Controller
                 $option->setTranslation('option_text', $lang, $text);
             }
         }
+
+        // رفع صورة جديدة إذا تم إرسالها
+        if ($request->hasFile('icon')) {
+            // حذف الصورة القديمة إذا كانت موجودة
+            if ($option->icon && file_exists(public_path($option->icon))) {
+                HelperFunc::deleteFile(public_path($option->icon));
+            }
+            // رفع الصورة الجديدة
+            $iconPath = HelperFunc::uploadFile('question_options', $request->file('icon'));
+            $option->icon = $iconPath;
+        }
         
         $option->update($request->only(['order']));
+
+        // إرجاع الـ URL الكامل للصورة
+        if ($option->icon) {
+            $option->icon = asset($option->icon);
+        }
 
         return HelperFunc::sendResponse(200, 'Option updated successfully', $option);
     }
@@ -103,6 +146,12 @@ class AdminQuestionOptionController extends Controller
     public function destroy($question_id, $id)
     {
         $option = QuestionOption::where('question_id', $question_id)->findOrFail($id);
+        
+        // حذف الصورة إذا كانت موجودة
+        if ($option->icon && file_exists(public_path($option->icon))) {
+            HelperFunc::deleteFile(public_path($option->icon));
+        }
+        
         $option->delete();
 
         return HelperFunc::sendResponse(200, 'Option deleted successfully', []);

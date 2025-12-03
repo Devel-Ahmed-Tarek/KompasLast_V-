@@ -191,6 +191,7 @@ class AdminTypeQuestionController extends Controller
                 return [
                     'id' => $option->id,
                     'option_text' => $optionText,
+                    'icon' => $option->icon ? asset($option->icon) : null,
                     'order' => $option->order,
                 ];
             }),
@@ -213,6 +214,7 @@ class AdminTypeQuestionController extends Controller
                     $childData['triggered_by_option'] = [
                         'id' => $parentOption->id,
                         'option_text' => $parentOptionText,
+                        'icon' => $parentOption->icon ? asset($parentOption->icon) : null,
                     ];
                 }
             }
