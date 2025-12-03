@@ -175,18 +175,22 @@ class AdminTypeQuestionController extends Controller
      */
     private function buildQuestionTree($question)
     {
+        // الحصول على جميع الترجمات لضمان إرجاع جميع اللغات الخمس
+        $questionText = $this->getAllLanguages($question, 'question_text');
+
         $data = [
             'id' => $question->id,
-            'question_text' => $question->question_text,
+            'question_text' => $questionText,
             'question_type' => $question->question_type,
             'is_required' => $question->is_required,
             'order' => $question->order,
             'parent_question_id' => $question->parent_question_id,
             'parent_option_id' => $question->parent_option_id,
             'options' => $question->options->map(function ($option) {
+                $optionText = $this->getAllLanguages($option, 'option_text');
                 return [
                     'id' => $option->id,
-                    'option_text' => $option->option_text,
+                    'option_text' => $optionText,
                     'order' => $option->order,
                 ];
             }),
@@ -204,14 +208,68 @@ class AdminTypeQuestionController extends Controller
             // إضافة معلومات الـ parent option للتوضيح
             if ($child->parent_option_id) {
                 $parentOption = \App\Models\QuestionOption::find($child->parent_option_id);
-                $childData['triggered_by_option'] = [
-                    'id' => $parentOption->id ?? null,
-                    'option_text' => $parentOption->option_text ?? null,
-                ];
+                if ($parentOption) {
+                    $parentOptionText = $this->getAllLanguages($parentOption, 'option_text');
+                    $childData['triggered_by_option'] = [
+                        'id' => $parentOption->id,
+                        'option_text' => $parentOptionText,
+                    ];
+                }
             }
             $data['child_questions'][] = $childData;
         }
 
         return $data;
+    }
+
+    /**
+     * الحصول على جميع اللغات الخمس للحقل المترجم
+     */
+    private function getAllLanguages($model, $field)
+    {
+        $languages = ['en', 'de', 'fr', 'it', 'ar'];
+        
+        // محاولة استخدام getTranslations أولاً (Spatie Translatable)
+        try {
+            $translations = $model->getTranslations($field);
+            if (is_array($translations) && !empty($translations)) {
+                $result = [];
+                foreach ($languages as $lang) {
+                    $result[$lang] = $translations[$lang] ?? null;
+                }
+                return $result;
+            }
+        } catch (\Exception $e) {
+            // إذا فشل getTranslations، نتابع للطرق الأخرى
+        }
+        
+        // محاولة الوصول المباشر للحقل (قد يكون JSON object)
+        $value = $model->$field;
+        
+        if (is_array($value)) {
+            $result = [];
+            foreach ($languages as $lang) {
+                $result[$lang] = $value[$lang] ?? null;
+            }
+            return $result;
+        }
+        
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                $result = [];
+                foreach ($languages as $lang) {
+                    $result[$lang] = $decoded[$lang] ?? null;
+                }
+                return $result;
+            }
+        }
+        
+        // إذا لم نجد أي ترجمات، نعيد array بجميع اللغات كـ null
+        $result = [];
+        foreach ($languages as $lang) {
+            $result[$lang] = null;
+        }
+        return $result;
     }
 }
