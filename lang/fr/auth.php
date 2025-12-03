@@ -1,0 +1,21 @@
+<?php
+return [
+    'auth_disabled'     => "L'authentification est actuellement désactivée",
+    'login_success'     => 'Connexion réussie',
+    'invalid_login'     => 'Les informations de connexion sont incorrectes',
+    'register_disabled' => "L'inscription des entreprises est actuellement désactivée",
+    'register_success'  => 'Entreprise enregistrée avec succès',
+    'validation_error'  => 'Erreurs de validation',
+    'server_error'      => 'Erreur serveur',
+    'otp_sent'          => 'OTP envoyé avec succès',
+    'otp_invalid'       => 'OTP invalide ou expiré',
+    'otp_valid'         => 'OTP valide',
+    'password_changed'  => 'Mot de passe changé avec succès',
+    'otp_subject'       => 'Votre code OTP',
+    'hello'             => 'Bonjour',
+    'otp_message'       => 'Vous avez demandé à réinitialiser votre mot de passe. Voici votre OTP :',
+    'your_otp'          => 'Votre code OTP :',
+    'otp_expiry'        => 'Cet OTP expirera dans 10 minutes.',
+    'otp_ignore'        => 'Si vous n\'avez pas fait cette demande, veuillez ignorer ce message.',
+    'thank_you'         => 'Merci d\'utiliser notre service !',
+];

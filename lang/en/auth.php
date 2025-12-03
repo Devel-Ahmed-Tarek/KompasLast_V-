@@ -1,0 +1,21 @@
+<?php
+return [
+    'auth_disabled'     => 'Auth is currently disabled',
+    'login_success'     => 'Login successfully',
+    'invalid_login'     => 'The login data is incorrect',
+    'register_disabled' => 'Company registration is currently disabled',
+    'register_success'  => 'Company registered successfully',
+    'validation_error'  => 'Validation errors',
+    'server_error'      => 'Server error',
+    'otp_sent'          => 'OTP sent successfully',
+    'otp_invalid'       => 'Invalid or expired OTP',
+    'otp_valid'         => 'OTP is valid',
+    'password_changed'  => 'Password changed successfully',
+    'otp_subject'       => 'Your OTP Code',
+    'hello'             => 'Hello',
+    'otp_message'       => 'You have requested to reset your password. Here is your OTP:',
+    'your_otp'          => 'Your OTP Code:',
+    'otp_expiry'        => 'This OTP will expire in 10 minutes.',
+    'otp_ignore'        => 'If you did not request this, please ignore this message.',
+    'thank_you'         => 'Thank you for using our service!',
+];
