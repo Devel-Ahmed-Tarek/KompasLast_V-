@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Models\FaqPage;
+use App\Models\FaqPageMedia;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class AdminFaqPageController extends Controller
@@ -12,7 +14,7 @@ class AdminFaqPageController extends Controller
     public function index()
     {
         // Fetch the first FAQ page
-        $data = FaqPage::first();
+        $data = FaqPage::with('media')->first();
 
         if (! $data) {
             return HelperFunc::sendResponse(404, 'FAQ Page not found');
@@ -20,17 +22,19 @@ class AdminFaqPageController extends Controller
 
         $images = [];
 
-        // Decode hero_image JSON
-        // return $data->hero_image;
-        $heroImages = json_decode($data->hero_image, true);
+        // Decode hero_image JSON (للتوافق مع النظام القديم)
+        $heroImages = json_decode($data->hero_image, true) ?? [];
 
-        if ($heroImages) {
-            foreach ($heroImages as $lang => $imagePath) {
-                $images[$lang] = asset($imagePath); // Generate full URL for each image
-            }
+        // إضافة اللغة العربية
+        $languages = ['en', 'de', 'fr', 'it', 'ar'];
+        foreach ($languages as $lang) {
+            $images[$lang] = isset($heroImages[$lang]) && $heroImages[$lang] ? asset($heroImages[$lang]) : null;
         }
 
         $data->hero_image = $images;
+        
+        // إضافة الصور الديناميكية
+        $data->dynamic_media = $this->formatDynamicMedia($data);
 
         return HelperFunc::sendResponse(200, 'done', $data);
     }

@@ -19,4 +19,23 @@ class FaqPage extends Model
         'meta_title',
         'meta_description',
     ];
+
+    public function media()
+    {
+        return $this->hasMany(FaqPageMedia::class);
+    }
+
+    /**
+     * جلب الصور لحقل معين و لغة معينة
+     */
+    public function getMediaByField($fieldName, $language = null)
+    {
+        $query = $this->media()->where('field_name', $fieldName);
+        
+        if ($language) {
+            $query->where('language', $language);
+        }
+        
+        return $query->orderBy('order')->get();
+    }
 }
