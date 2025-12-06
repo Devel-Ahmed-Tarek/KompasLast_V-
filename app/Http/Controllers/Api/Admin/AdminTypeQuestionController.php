@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\QuestionResource;
 use App\Models\Type;
 use App\Models\TypeQuestion;
 use Illuminate\Http\Request;
@@ -186,9 +187,10 @@ class AdminTypeQuestionController extends Controller
     /**
      * عرض الـ Flow Tree (شجرة الأسئلة)
      */
-    public function getFlowTree($type_id)
+    public function getFlowTree($type_id, Request $request)
     {
         $type = Type::findOrFail($type_id);
+        $lang = $request->get('lang', 'en'); // اللغة المطلوبة
 
         // جلب الأسئلة الرئيسية فقط
         $mainQuestions = TypeQuestion::where('type_id', $type_id)
@@ -197,9 +199,9 @@ class AdminTypeQuestionController extends Controller
             ->orderBy('order')
             ->get();
 
-        // بناء الشجرة
-        $tree = $mainQuestions->map(function ($question) {
-            return $this->buildQuestionTree($question);
+        // بناء الشجرة باستخدام QuestionResource
+        $tree = $mainQuestions->map(function ($question) use ($lang) {
+            return $this->buildQuestionTree($question, $lang);
         });
 
         return HelperFunc::sendResponse(200, 'Flow tree retrieved successfully', $tree);
@@ -208,30 +210,34 @@ class AdminTypeQuestionController extends Controller
     /**
      * بناء شجرة السؤال (recursive)
      */
-    private function buildQuestionTree($question)
+    private function buildQuestionTree($question, $lang = 'en')
     {
-        // الحصول على جميع الترجمات لضمان إرجاع جميع اللغات الخمس
-        $questionText = $this->getAllLanguages($question, 'question_text');
+        // استخدام QuestionResource كأساس
+        $questionResource = new QuestionResource($question, $lang);
+        $data = $questionResource->toArray(request());
 
-        $data = [
-            'id' => $question->id,
-            'question_text' => $questionText,
-            'question_type' => $question->question_type,
-            'is_required' => $question->is_required,
-            'order' => $question->order,
-            'parent_question_id' => $question->parent_question_id,
-            'parent_option_id' => $question->parent_option_id,
-            'options' => $question->options->map(function ($option) {
-                $optionText = $this->getAllLanguages($option, 'option_text');
-                return [
-                    'id' => $option->id,
-                    'option_text' => $optionText,
-                    'icon' => $option->icon ? asset($option->icon) : null,
-                    'order' => $option->order,
-                ];
-            }),
-            'child_questions' => [],
-        ];
+        // إضافة معلومات إضافية للـ Admin (جميع اللغات)
+        $questionText = $this->getAllLanguages($question, 'question_text');
+        $data['question_text_all_languages'] = $questionText;
+
+        // تحديث options لتشمل جميع اللغات
+        $data['options'] = $question->options->map(function ($option) {
+            $optionText = $this->getAllLanguages($option, 'option_text');
+            return [
+                'id' => $option->id,
+                'option_text' => $optionText, // جميع اللغات
+                'option_text_single' => $option->getTranslation('option_text', 'en'), // للتوافق
+                'icon' => $option->icon ? asset($option->icon) : null,
+                'order' => $option->order,
+            ];
+        });
+
+        // إضافة معلومات الملفات (من Resource)
+        $data['allows_file_upload'] = $question->allows_file_upload;
+        $data['is_file_question'] = $question->question_type === 'file' || $question->allows_file_upload;
+        $data['allowed_file_types'] = $question->allowed_file_types ? explode(',', $question->allowed_file_types) : null;
+        $data['max_files'] = $question->max_files;
+        $data['max_file_size'] = $question->max_file_size;
 
         // جلب الأسئلة الفرعية
         $childQuestions = TypeQuestion::where('parent_question_id', $question->id)
@@ -239,8 +245,11 @@ class AdminTypeQuestionController extends Controller
             ->orderBy('order')
             ->get();
 
+        $data['child_questions'] = [];
+
         foreach ($childQuestions as $child) {
-            $childData = $this->buildQuestionTree($child);
+            $childData = $this->buildQuestionTree($child, $lang);
+
             // إضافة معلومات الـ parent option للتوضيح
             if ($child->parent_option_id) {
                 $parentOption = \App\Models\QuestionOption::find($child->parent_option_id);
@@ -248,11 +257,12 @@ class AdminTypeQuestionController extends Controller
                     $parentOptionText = $this->getAllLanguages($parentOption, 'option_text');
                     $childData['triggered_by_option'] = [
                         'id' => $parentOption->id,
-                        'option_text' => $parentOptionText,
+                        'option_text' => $parentOptionText, // جميع اللغات
                         'icon' => $parentOption->icon ? asset($parentOption->icon) : null,
                     ];
                 }
             }
+
             $data['child_questions'][] = $childData;
         }
 
