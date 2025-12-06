@@ -15,6 +15,10 @@ class TypeQuestion extends Model
         'question_text',
         'question_type',
         'is_required',
+        'allows_file_upload',
+        'allowed_file_types',
+        'max_files',
+        'max_file_size',
         'order',
         'parent_question_id',
         'parent_option_id',
@@ -27,7 +31,10 @@ class TypeQuestion extends Model
 
     protected $casts = [
         'is_required' => 'boolean',
+        'allows_file_upload' => 'boolean',
         'order' => 'integer',
+        'max_files' => 'integer',
+        'max_file_size' => 'integer',
     ];
 
     // العلاقات

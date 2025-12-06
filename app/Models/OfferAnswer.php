@@ -31,4 +31,9 @@ class OfferAnswer extends Model
         return $this->belongsToMany(QuestionOption::class, 'offer_answer_options', 'offer_answer_id', 'option_id')
             ->withTimestamps();
     }
+
+    public function files()
+    {
+        return $this->hasMany(OfferAnswerFile::class);
+    }
 }

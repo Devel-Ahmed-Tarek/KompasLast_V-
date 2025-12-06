@@ -59,6 +59,8 @@ Route::prefix('user')->group(function () {
         Route::post('/answer', [OfferQuestionController::class, 'submitAnswer']);
         Route::get('/answers', [OfferQuestionController::class, 'getAnswers']);
         Route::put('/answers/{answer_id}', [OfferQuestionController::class, 'updateAnswer']);
+        Route::post('/answers/{answer_id}/files', [OfferQuestionController::class, 'uploadFiles']);
+        Route::delete('/answers/{answer_id}/files/{file_id}', [OfferQuestionController::class, 'deleteFile']);
     });
 
 });

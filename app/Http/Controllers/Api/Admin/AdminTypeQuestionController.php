@@ -39,6 +39,10 @@ class AdminTypeQuestionController extends Controller
             'question_text.ar' => 'nullable|string',
             'question_type' => 'required|in:text,single_choice,multi_choice,number,date,email,phone',
             'is_required' => 'nullable|boolean',
+            'allows_file_upload' => 'nullable|boolean',
+            'allowed_file_types' => 'nullable|string', // مثلاً: "image,video,document"
+            'max_files' => 'nullable|integer|min:1',
+            'max_file_size' => 'nullable|integer|min:1', // بالـ MB
             'order' => 'nullable|integer',
             'parent_question_id' => 'nullable|exists:type_questions,id',
             'parent_option_id' => 'nullable|exists:question_options,id',
@@ -55,6 +59,10 @@ class AdminTypeQuestionController extends Controller
             'question_text' => $request->question_text,
             'question_type' => $request->question_type,
             'is_required' => $request->is_required ?? true,
+            'allows_file_upload' => $request->allows_file_upload ?? false,
+            'allowed_file_types' => $request->allowed_file_types ?? 'image,video,document',
+            'max_files' => $request->max_files ?? 10,
+            'max_file_size' => $request->max_file_size ?? 10, // بالـ MB
             'order' => $request->order ?? 0,
             'parent_question_id' => $request->parent_question_id,
             'parent_option_id' => $request->parent_option_id,
@@ -89,6 +97,10 @@ class AdminTypeQuestionController extends Controller
             'question_text.ar' => 'nullable|string',
             'question_type' => 'nullable|in:text,single_choice,multi_choice,number,date,email,phone',
             'is_required' => 'nullable|boolean',
+            'allows_file_upload' => 'nullable|boolean',
+            'allowed_file_types' => 'nullable|string',
+            'max_files' => 'nullable|integer|min:1',
+            'max_file_size' => 'nullable|integer|min:1',
             'order' => 'nullable|integer',
             'parent_question_id' => 'nullable|exists:type_questions,id',
             'parent_option_id' => 'nullable|exists:question_options,id',
@@ -109,6 +121,10 @@ class AdminTypeQuestionController extends Controller
         $question->update($request->only([
             'question_type',
             'is_required',
+            'allows_file_upload',
+            'allowed_file_types',
+            'max_files',
+            'max_file_size',
             'order',
             'parent_question_id',
             'parent_option_id',

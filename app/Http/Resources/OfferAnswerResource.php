@@ -36,6 +36,18 @@ class OfferAnswerResource extends JsonResource
                     'option_text' => $option->getTranslation('option_text', $lang),
                 ];
             }),
+            'files' => $this->whenLoaded('files', function() {
+                return $this->files->map(function($file) {
+                    return [
+                        'id' => $file->id,
+                        'file_name' => $file->file_name,
+                        'file_type' => $file->file_type,
+                        'file_url' => $file->file_url,
+                        'file_size' => $file->file_size,
+                        'mime_type' => $file->mime_type,
+                    ];
+                });
+            }),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
