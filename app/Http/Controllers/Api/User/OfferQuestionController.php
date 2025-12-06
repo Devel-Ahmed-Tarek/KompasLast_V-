@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\User;
 
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\QuestionResource;
 use App\Models\Offer;
 use App\Models\OfferAnswer;
 use App\Models\OfferAnswerFile;
@@ -43,23 +44,7 @@ class OfferQuestionController extends Controller
         $answeredCount = $offer->answers()->count();
 
         return HelperFunc::sendResponse(200, 'First question retrieved successfully', [
-            'question' => [
-                'id' => $firstQuestion->id,
-                'question_text' => $firstQuestion->getTranslation('question_text', $lang),
-                'question_type' => $firstQuestion->question_type,
-                'is_required' => $firstQuestion->is_required,
-                'allows_file_upload' => $firstQuestion->allows_file_upload,
-                'allowed_file_types' => $firstQuestion->allowed_file_types ? explode(',', $firstQuestion->allowed_file_types) : null,
-                'max_files' => $firstQuestion->max_files,
-                'max_file_size' => $firstQuestion->max_file_size,
-                'options' => $firstQuestion->options->map(function ($option) use ($lang) {
-                    return [
-                        'id' => $option->id,
-                        'option_text' => $option->getTranslation('option_text', $lang),
-                        'order' => $option->order,
-                    ];
-                }),
-            ],
+            'question' => new QuestionResource($firstQuestion, $lang),
             'total_questions' => $totalQuestions,
             'answered_count' => $answeredCount,
             'progress' => [
@@ -84,23 +69,7 @@ class OfferQuestionController extends Controller
             ->findOrFail($question_id);
 
         return HelperFunc::sendResponse(200, 'Question retrieved successfully', [
-            'question' => [
-                'id' => $question->id,
-                'question_text' => $question->getTranslation('question_text', $lang),
-                'question_type' => $question->question_type,
-                'is_required' => $question->is_required,
-                'allows_file_upload' => $question->allows_file_upload,
-                'allowed_file_types' => $question->allowed_file_types ? explode(',', $question->allowed_file_types) : null,
-                'max_files' => $question->max_files,
-                'max_file_size' => $question->max_file_size,
-                'options' => $question->options->map(function ($option) use ($lang) {
-                    return [
-                        'id' => $option->id,
-                        'option_text' => $option->getTranslation('option_text', $lang),
-                        'order' => $option->order,
-                    ];
-                }),
-            ],
+            'question' => new QuestionResource($question->load('options'), $lang),
         ]);
     }
 
@@ -184,23 +153,7 @@ class OfferQuestionController extends Controller
         ];
 
         if ($nextQuestion) {
-            $response['next_question'] = [
-                'id' => $nextQuestion->id,
-                'question_text' => $nextQuestion->getTranslation('question_text', $lang),
-                'question_type' => $nextQuestion->question_type,
-                'is_required' => $nextQuestion->is_required,
-                'allows_file_upload' => $nextQuestion->allows_file_upload,
-                'allowed_file_types' => $nextQuestion->allowed_file_types ? explode(',', $nextQuestion->allowed_file_types) : null,
-                'max_files' => $nextQuestion->max_files,
-                'max_file_size' => $nextQuestion->max_file_size,
-                'options' => $nextQuestion->options->map(function ($option) use ($lang) {
-                    return [
-                        'id' => $option->id,
-                        'option_text' => $option->getTranslation('option_text', $lang),
-                        'order' => $option->order,
-                    ];
-                }),
-            ];
+            $response['next_question'] = new QuestionResource($nextQuestion->load('options'), $lang);
         }
 
         return HelperFunc::sendResponse(200, 'Answer submitted successfully', $response);
