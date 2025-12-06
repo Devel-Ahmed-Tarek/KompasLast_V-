@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Resources\Website;
 
 use App\Helpers\HelperFunc;
@@ -9,6 +10,11 @@ class HomePageResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $locale = app()->getLocale(); // Get the current locale
+
+        // جلب الصور الديناميكية
+        $dynamicMedia = $this->getDynamicMedia($this->home, $locale);
+
         return [
             'home'               => [
                 'hero_image'                    => $this->home->hero_imge,
@@ -69,6 +75,7 @@ class HomePageResource extends JsonResource
                 'faq_image'                     => $this->home->faq_image,
                 'our_trusted_companies'         => $this->home->our_trusted_Companies,
                 'what_clients_say_about'        => $this->home->what_clients_say_cabout,
+                'media'                          => $dynamicMedia, // الصور الديناميكية (null إذا لم تكن موجودة)
             ],
 
             'services_title'     => $this->home->services_title,
@@ -76,7 +83,7 @@ class HomePageResource extends JsonResource
             'services'           => $this->services->map(function ($service) {
                 $typeDetails = optional($service->typeDitaliServices);
                 $locale = app()->getLocale();
-                
+
                 // جلب الصور الديناميكية
                 $dynamicMedia = [];
                 if ($typeDetails && $typeDetails->relationLoaded('media')) {
@@ -85,7 +92,7 @@ class HomePageResource extends JsonResource
                         ->orderBy('field_name')
                         ->orderBy('order')
                         ->get();
-                    
+
                     foreach ($media as $item) {
                         $fieldName = $item->field_name;
                         if (!isset($dynamicMedia[$fieldName])) {
@@ -99,7 +106,7 @@ class HomePageResource extends JsonResource
                             'order' => $item->order,
                         ];
                     }
-                    
+
                     // إذا كان في صورة واحدة فقط، نرجعها مباشرة
                     foreach ($dynamicMedia as $fieldName => $images) {
                         if (count($images) === 1) {
@@ -107,7 +114,7 @@ class HomePageResource extends JsonResource
                         }
                     }
                 }
-                
+
                 return [
                     'id'                => $service->id,
                     'name'              => $service->name,
@@ -129,7 +136,6 @@ class HomePageResource extends JsonResource
                     'question' => $item->question,
                     'answer'   => $item->answer,
                 ];
-
             }),
 
             'form'               => $this->form ? [
@@ -176,5 +182,55 @@ class HomePageResource extends JsonResource
                 ];
             }),
         ];
+    }
+
+    /**
+     * جلب الصور الديناميكية للغة المحددة
+     * ترجع null إذا لم تكن هناك صور
+     */
+    private function getDynamicMedia($home, $locale)
+    {
+        if (!$home->relationLoaded('media')) {
+            return null;
+        }
+
+        $media = $home->media()
+            ->where('language', $locale)
+            ->orderBy('field_name')
+            ->orderBy('order')
+            ->get();
+
+        if ($media->isEmpty()) {
+            return null; // إذا مفيش صور، نرجع null
+        }
+
+        $formatted = [];
+
+        foreach ($media as $item) {
+            $fieldName = $item->field_name;
+
+            if (!isset($formatted[$fieldName])) {
+                $formatted[$fieldName] = [];
+            }
+
+            $formatted[$fieldName][] = [
+                'id' => $item->id,
+                'file_path' => asset($item->file_path),
+                'file_name' => $item->file_name,
+                'file_type' => $item->file_type,
+                'file_size' => $item->file_size,
+                'order' => $item->order,
+                'metadata' => $item->metadata,
+            ];
+        }
+
+        // إذا كان في صورة واحدة فقط، نرجعها مباشرة (ليس array)
+        foreach ($formatted as $fieldName => $images) {
+            if (count($images) === 1) {
+                $formatted[$fieldName] = $images[0];
+            }
+        }
+
+        return $formatted;
     }
 }

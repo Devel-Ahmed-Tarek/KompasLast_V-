@@ -35,7 +35,7 @@ class HomePageController extends Controller
         App::setLocale($language);
 
         // Fetch the data based on language
-        $data['home']        = Home::first()?->makeHidden(['created_at', 'updated_at']);
+        $data['home']        = Home::with('media')->first()?->makeHidden(['created_at', 'updated_at']);
         $data['form']        = Form::first()?->makeHidden(['created_at', 'updated_at']);
         $data['faq']         = Faq::take(5)->get()?->makeHidden(['created_at', 'updated_at']);
         $data['partnerPage'] = PartnerPage::first()?->makeHidden(['created_at', 'updated_at']);
