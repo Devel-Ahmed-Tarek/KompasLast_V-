@@ -16,7 +16,7 @@ class ServesPageController extends Controller
         $language = $request->get('lang', 'en'); // Default to 'en' if no language is provided
         App::setLocale($language);
 
-        $serves = Type::with(['typeDitaliServices', 'TypeTips', 'TypeFeature', 'typeDitaliServesPageForm'])
+        $serves = Type::with(['typeDitaliServices.media', 'TypeTips', 'TypeFeature', 'typeDitaliServesPageForm'])
             ->whereHas('typeDitaliServices', function ($query) use ($slug) {
                 $query->whereRaw("JSON_SEARCH(slug, 'one', ?) IS NOT NULL", [$slug]);
             })

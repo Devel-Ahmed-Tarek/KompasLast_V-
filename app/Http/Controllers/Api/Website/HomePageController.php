@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api\Website;
 
 use App\Helpers\HelperFunc;
@@ -29,7 +30,7 @@ class HomePageController extends Controller
 {
     public function index(Request $request)
     {
-                                                          // Set language for the application based on the user's request
+        // Set language for the application based on the user's request
         $language = $request->get('lang', default: 'en'); // Default to 'en' if no language is provided
         App::setLocale($language);
 
@@ -40,7 +41,9 @@ class HomePageController extends Controller
         $data['partnerPage'] = PartnerPage::first()?->makeHidden(['created_at', 'updated_at']);
 
         // Fetch services and localize data if needed
-        $data['services'] = Type::with('typeDitaliServices:id,type_id,short_description,small_image,slug,service_home_icon')
+        $data['services'] = Type::with(['typeDitaliServices' => function ($query) {
+            $query->select('id', 'type_id', 'short_description', 'small_image', 'slug', 'service_home_icon');
+        }, 'typeDitaliServices.media'])
             ->select('id', 'name')
             ->get()
             ->map(function ($item) {
@@ -175,7 +178,6 @@ class HomePageController extends Controller
                 'de' => 'Ein neues Angebot "' . $offer->name,
             ]);
             return HelperFunc::sendResponse(201, 'Offer created successfully', $offer);
-
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }
@@ -219,7 +221,7 @@ class HomePageController extends Controller
             // عناوين الشوارع (بسيطة مثل: "123 Main St" أو "42 Elm Street")
             '/\b\d+\s[A-Za-z]+\s(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|Boulevard|Blvd|Drive|Dr|Court|Ct|Way|Square|Sq|Place|Pl|Terrace|Terr|Parkway|Pkwy)\b/i',
 
-                                    // أي نمط آخر يشتبه في كونه عنوانًا أو رقمًا
+            // أي نمط آخر يشتبه في كونه عنوانًا أو رقمًا
             '/\b\d+\s[A-Za-z]+\b/', // مثل "123 Main"
         ];
 
@@ -330,6 +332,5 @@ class HomePageController extends Controller
     {
         $locale = $user->lang ?? 'en';
         Mail::to($user->email)->send(new OfferSelling($offer));
-
     }
 }

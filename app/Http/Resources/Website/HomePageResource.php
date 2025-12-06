@@ -75,6 +75,39 @@ class HomePageResource extends JsonResource
             'services_sub_title' => $this->home->services_sub_title,
             'services'           => $this->services->map(function ($service) {
                 $typeDetails = optional($service->typeDitaliServices);
+                $locale = app()->getLocale();
+                
+                // جلب الصور الديناميكية
+                $dynamicMedia = [];
+                if ($typeDetails && $typeDetails->relationLoaded('media')) {
+                    $media = $typeDetails->media()
+                        ->where('language', $locale)
+                        ->orderBy('field_name')
+                        ->orderBy('order')
+                        ->get();
+                    
+                    foreach ($media as $item) {
+                        $fieldName = $item->field_name;
+                        if (!isset($dynamicMedia[$fieldName])) {
+                            $dynamicMedia[$fieldName] = [];
+                        }
+                        $dynamicMedia[$fieldName][] = [
+                            'id' => $item->id,
+                            'file_path' => asset($item->file_path),
+                            'file_name' => $item->file_name,
+                            'file_type' => $item->file_type,
+                            'order' => $item->order,
+                        ];
+                    }
+                    
+                    // إذا كان في صورة واحدة فقط، نرجعها مباشرة
+                    foreach ($dynamicMedia as $fieldName => $images) {
+                        if (count($images) === 1) {
+                            $dynamicMedia[$fieldName] = $images[0];
+                        }
+                    }
+                }
+                
                 return [
                     'id'                => $service->id,
                     'name'              => $service->name,
@@ -82,6 +115,7 @@ class HomePageResource extends JsonResource
                     'slug'              => $typeDetails->slug ?? 'No description available',
                     'small_image'       => HelperFunc::getLocalizedImage($typeDetails->small_image) ? asset(HelperFunc::getLocalizedImage($typeDetails->small_image)) : null,
                     'service_home_icon' => $typeDetails->service_home_icon ? asset($typeDetails->service_home_icon) : null,
+                    'media'             => $dynamicMedia, // الصور الديناميكية
                 ];
             }),
 
