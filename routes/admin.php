@@ -55,7 +55,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
         Route::get('get-daily-offer', [DashboardController::class, 'getOffersChartData']);
         Route::get('get-info-data', [DashboardController::class, 'getInfoDataToDashboard']);
     });
-
+    // https://kompass.alwekala.store/public/api/admin/teps/types/19
     // Authentication routes
     Route::post('logout', [AdminAuthController::class, 'logout']);
     Route::post('change-password', [AdminAuthController::class, 'changePassword']);
@@ -276,5 +276,4 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::post('remove/types', [AdminCompanyController::class, 'deleteType']);
     Route::get('company/types/dont/haveing', [AdminCompanyController::class, 'gityourType']);
     Route::get('company/types/haveing', [AdminCompanyController::class, 'TypesHaveing']);
-
 });
