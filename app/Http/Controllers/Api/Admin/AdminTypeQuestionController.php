@@ -40,7 +40,7 @@ class AdminTypeQuestionController extends Controller
             'question_type' => 'required|in:text,single_choice,multi_choice,number,date,email,phone',
             'is_required' => 'nullable|boolean',
             'allows_file_upload' => 'nullable|boolean',
-            'allowed_file_types' => 'nullable|string', // مثلاً: "image,video,document"
+            'allowed_file_types' => 'nullable', // يقبل string أو array
             'max_files' => 'nullable|integer|min:1',
             'max_file_size' => 'nullable|integer|min:1', // بالـ MB
             'order' => 'nullable|integer',
@@ -54,13 +54,21 @@ class AdminTypeQuestionController extends Controller
 
         $type = Type::findOrFail($type_id);
 
+        // تحويل allowed_file_types من array إلى string إذا لزم
+        $allowedFileTypes = $request->allowed_file_types;
+        if (is_array($allowedFileTypes)) {
+            $allowedFileTypes = implode(',', $allowedFileTypes);
+        } elseif (empty($allowedFileTypes)) {
+            $allowedFileTypes = 'image,video,document';
+        }
+
         $question = TypeQuestion::create([
             'type_id' => $type_id,
             'question_text' => $request->question_text,
             'question_type' => $request->question_type,
             'is_required' => $request->is_required ?? true,
             'allows_file_upload' => $request->allows_file_upload ?? false,
-            'allowed_file_types' => $request->allowed_file_types ?? 'image,video,document',
+            'allowed_file_types' => $allowedFileTypes,
             'max_files' => $request->max_files ?? 10,
             'max_file_size' => $request->max_file_size ?? 10, // بالـ MB
             'order' => $request->order ?? 0,
@@ -98,7 +106,7 @@ class AdminTypeQuestionController extends Controller
             'question_type' => 'nullable|in:text,single_choice,multi_choice,number,date,email,phone',
             'is_required' => 'nullable|boolean',
             'allows_file_upload' => 'nullable|boolean',
-            'allowed_file_types' => 'nullable|string',
+            'allowed_file_types' => 'nullable', // يقبل string أو array
             'max_files' => 'nullable|integer|min:1',
             'max_file_size' => 'nullable|integer|min:1',
             'order' => 'nullable|integer',
@@ -118,17 +126,28 @@ class AdminTypeQuestionController extends Controller
             }
         }
 
-        $question->update($request->only([
+        // تحويل allowed_file_types من array إلى string إذا لزم
+        $updateData = $request->only([
             'question_type',
             'is_required',
             'allows_file_upload',
-            'allowed_file_types',
             'max_files',
             'max_file_size',
             'order',
             'parent_question_id',
             'parent_option_id',
-        ]));
+        ]);
+
+        if ($request->has('allowed_file_types')) {
+            $allowedFileTypes = $request->allowed_file_types;
+            if (is_array($allowedFileTypes)) {
+                $updateData['allowed_file_types'] = implode(',', $allowedFileTypes);
+            } else {
+                $updateData['allowed_file_types'] = $allowedFileTypes;
+            }
+        }
+
+        $question->update($updateData);
 
         return HelperFunc::sendResponse(200, 'Question updated successfully', $question);
     }
@@ -246,7 +265,7 @@ class AdminTypeQuestionController extends Controller
     private function getAllLanguages($model, $field)
     {
         $languages = ['en', 'de', 'fr', 'it', 'ar'];
-        
+
         // محاولة استخدام getTranslations أولاً (Spatie Translatable)
         try {
             $translations = $model->getTranslations($field);
@@ -260,10 +279,10 @@ class AdminTypeQuestionController extends Controller
         } catch (\Exception $e) {
             // إذا فشل getTranslations، نتابع للطرق الأخرى
         }
-        
+
         // محاولة الوصول المباشر للحقل (قد يكون JSON object)
         $value = $model->$field;
-        
+
         if (is_array($value)) {
             $result = [];
             foreach ($languages as $lang) {
@@ -271,7 +290,7 @@ class AdminTypeQuestionController extends Controller
             }
             return $result;
         }
-        
+
         if (is_string($value)) {
             $decoded = json_decode($value, true);
             if (is_array($decoded)) {
@@ -282,7 +301,7 @@ class AdminTypeQuestionController extends Controller
                 return $result;
             }
         }
-        
+
         // إذا لم نجد أي ترجمات، نعيد array بجميع اللغات كـ null
         $result = [];
         foreach ($languages as $lang) {
