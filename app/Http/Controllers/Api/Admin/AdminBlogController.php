@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
@@ -34,13 +35,17 @@ class AdminBlogController extends BaseController
             $mainImages = $blog->main_image;
 
             // Convert image paths to full URLs for all languages
-            foreach (['en', 'de', 'fr', 'it'] as $lang) {
-                $images[$lang]     = isset($images[$lang]) ? asset($images[$lang]) : null;
-                $mainImages[$lang] = isset($mainImages[$lang]) ? asset($mainImages[$lang]) : null;
+            $languages = ['en', 'de', 'fr', 'it', 'ar'];
+            foreach ($languages as $lang) {
+                $images[$lang]     = isset($images[$lang]) && $images[$lang] ? asset($images[$lang]) : null;
+                $mainImages[$lang] = isset($mainImages[$lang]) && $mainImages[$lang] ? asset($mainImages[$lang]) : null;
             }
 
             $blog->image      = $images;
             $blog->main_image = $mainImages;
+
+            // إضافة الصور الديناميكية
+            $blog->dynamic_media = $this->formatDynamicMedia($blog);
 
             return $blog;
         });
@@ -51,7 +56,7 @@ class AdminBlogController extends BaseController
 
     public function store(Request $request)
     {
-        $imageLanguages = ['en', 'de', 'fr', 'it']; // Define supported languages
+        $imageLanguages = ['en', 'de', 'fr', 'it', 'ar']; // Define supported languages
 
         $validator = Validator::make($request->all(), [
             'type_id'           => 'required|exists:types,id',
@@ -110,16 +115,15 @@ class AdminBlogController extends BaseController
             ]);
 
             $post = Blog::find($id);
-            
+
             // معالجة الصور الديناميكية
             $this->processDynamicMedia($request, $post);
-            
+
             // إرجاع البيانات مع الصور
             $post->load('media');
             $post->dynamic_media = $this->formatDynamicMedia($post);
 
             return HelperFunc::sendResponse(200, 'Post created successfully', $post);
-
         } catch (Exception $e) {
             return HelperFunc::sendResponse(500, 'Server Error', [$e->getMessage()]);
         }
@@ -127,7 +131,7 @@ class AdminBlogController extends BaseController
 
     public function update(Request $request, $id)
     {
-        $imageLanguages = ['en', 'de', 'fr', 'it']; // Supported languages
+        $imageLanguages = ['en', 'de', 'fr', 'it', 'ar']; // Supported languages
 
         // Find the blog post
         $post = Blog::findOrFail($id);
@@ -189,8 +193,16 @@ class AdminBlogController extends BaseController
 
         // Update translations for the blog
         $validated = $request->only([
-            'type_id', 'title', 'short_description', 'body', 'meta_title',
-            'key_key', 'key_description', 'btn', 'slug', 'btn_hrf',
+            'type_id',
+            'title',
+            'short_description',
+            'body',
+            'meta_title',
+            'key_key',
+            'key_description',
+            'btn',
+            'slug',
+            'btn_hrf',
         ]);
 
         foreach ($validated as $key => $value) {
@@ -210,7 +222,7 @@ class AdminBlogController extends BaseController
 
         // Save the updated post
         $post->save();
-        
+
         // إرجاع البيانات مع الصور
         $post->load('media');
         $post->dynamic_media = $this->formatDynamicMedia($post);
@@ -228,9 +240,14 @@ class AdminBlogController extends BaseController
             $mainImages = $blog->main_image;
 
             // Convert image paths to full URLs for all languages
-            foreach (['en', 'de', 'fr', 'it'] as $lang) {
-                HelperFunc::deleteFile($images[$lang]);
-                HelperFunc::deleteFile($mainImages[$lang]);
+            $languages = ['en', 'de', 'fr', 'it', 'ar'];
+            foreach ($languages as $lang) {
+                if (isset($images[$lang]) && $images[$lang]) {
+                    HelperFunc::deleteFile($images[$lang]);
+                }
+                if (isset($mainImages[$lang]) && $mainImages[$lang]) {
+                    HelperFunc::deleteFile($mainImages[$lang]);
+                }
             }
 
             // حذف المنشور
@@ -241,7 +258,6 @@ class AdminBlogController extends BaseController
             return HelperFunc::sendResponse(404, 'Blog not found');
         } catch (Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred while deleting the blog');
-
         }
     }
     public function show($id)
@@ -251,27 +267,26 @@ class AdminBlogController extends BaseController
             $blog = Blog::with(['type', 'media'])->findOrFail($id);
 
             // فك تشفير الحقول المخزنة كـ JSON (مثل الصور)
-            $images     = $blog->image;
-            $mainImages = $blog->main_image;
+            $originalImages     = $blog->image ?? [];
+            $originalMainImages = $blog->main_image ?? [];
 
             // إضافة الروابط الكاملة للصور
-            $languages  = ['en', 'de', 'fr', 'it'];
+            $languages  = ['en', 'de', 'fr', 'it', 'ar'];
             $images     = [];
             $mainImages = [];
             foreach ($languages as $lang) {
-                $mainImages[$lang] = isset($blog->main_image[$lang]) ? asset($blog->main_image[$lang]) : null;
-                $images[$lang]     = isset($blog->image[$lang]) ? asset($blog->image[$lang]) : null;
+                $mainImages[$lang] = isset($originalMainImages[$lang]) && $originalMainImages[$lang] ? asset($originalMainImages[$lang]) : null;
+                $images[$lang]     = isset($originalImages[$lang]) && $originalImages[$lang] ? asset($originalImages[$lang]) : null;
             }
 
             $blog->image      = $images;
             $blog->main_image = $mainImages;
-            
+
             // إضافة الصور الديناميكية
             $blog->dynamic_media = $this->formatDynamicMedia($blog);
 
             // إرجاع التفاصيل بنجاح
             return HelperFunc::sendResponse(200, 'Blog details retrieved successfully', $blog);
-
         } catch (ModelNotFoundException $e) {
             return HelperFunc::sendResponse(404, 'Blog not found', []);
         } catch (Exception $e) {
@@ -285,7 +300,6 @@ class AdminBlogController extends BaseController
         $blog->status = $status;
         $blog->save();
         return HelperFunc::sendResponse(200, 'Post updated successfully', $blog->status);
-
     }
 
     /**
@@ -299,7 +313,7 @@ class AdminBlogController extends BaseController
 
         $mediaData = $request->input('media', []);
         $languages = ['en', 'de', 'fr', 'it', 'ar'];
-        
+
         // معالجة كل حقل
         foreach ($mediaData as $fieldName => $languagesData) {
             if (!is_array($languagesData)) {
@@ -345,10 +359,10 @@ class AdminBlogController extends BaseController
 
         // رفع الملف
         $filePath = HelperFunc::uploadFile('/images', $file);
-        
+
         // تحديد نوع الملف
         $fileType = $this->getFileType($file);
-        
+
         // حفظ في قاعدة البيانات
         BlogMedia::create([
             'blog_id' => $blog->id,
@@ -369,7 +383,7 @@ class AdminBlogController extends BaseController
     private function getFileType($file)
     {
         $mimeType = $file->getMimeType();
-        
+
         if (str_starts_with($mimeType, 'image/')) {
             return 'image';
         } elseif (str_starts_with($mimeType, 'video/')) {
@@ -385,22 +399,22 @@ class AdminBlogController extends BaseController
     private function formatDynamicMedia(Blog $blog)
     {
         $media = $blog->media()->orderBy('field_name')->orderBy('language')->orderBy('order')->get();
-        
+
         if ($media->isEmpty()) {
             return null; // إذا مفيش صور، نرجع null
         }
-        
+
         $formatted = [];
-        
+
         foreach ($media as $item) {
             if (!isset($formatted[$item->field_name])) {
                 $formatted[$item->field_name] = [];
             }
-            
+
             if (!isset($formatted[$item->field_name][$item->language])) {
                 $formatted[$item->field_name][$item->language] = [];
             }
-            
+
             $formatted[$item->field_name][$item->language][] = [
                 'id' => $item->id,
                 'file_path' => asset($item->file_path),
@@ -411,7 +425,7 @@ class AdminBlogController extends BaseController
                 'metadata' => $item->metadata,
             ];
         }
-        
+
         // إذا كان في صورة واحدة فقط لكل حقل و لغة، نرجعها مباشرة
         foreach ($formatted as $fieldName => $languages) {
             foreach ($languages as $language => $images) {
@@ -420,8 +434,7 @@ class AdminBlogController extends BaseController
                 }
             }
         }
-        
+
         return $formatted;
     }
-
 }
