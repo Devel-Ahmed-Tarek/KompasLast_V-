@@ -3,11 +3,13 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
 use App\Models\Blog;
+use App\Models\BlogMedia;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class AdminBlogController extends BaseController
@@ -24,7 +26,7 @@ class AdminBlogController extends BaseController
     public function index()
     {
         // Fetch paginated blogs
-        $blogs = Blog::with('type')->orderBy('id', 'desc')->paginate(10);
+        $blogs = Blog::with(['type', 'media'])->orderBy('id', 'desc')->paginate(10);
 
         // Map over each blog to add asset URLs for images
         $blogs->getCollection()->transform(function ($blog) {
@@ -107,7 +109,14 @@ class AdminBlogController extends BaseController
                 'updated_at'        => now(),
             ]);
 
-            $post = DB::table('blogs')->where('id', $id)->first();
+            $post = Blog::find($id);
+            
+            // معالجة الصور الديناميكية
+            $this->processDynamicMedia($request, $post);
+            
+            // إرجاع البيانات مع الصور
+            $post->load('media');
+            $post->dynamic_media = $this->formatDynamicMedia($post);
 
             return HelperFunc::sendResponse(200, 'Post created successfully', $post);
 
@@ -196,8 +205,15 @@ class AdminBlogController extends BaseController
         $post->image      = $smallImages;
         $post->main_image = $mainImages;
 
+        // معالجة الصور الديناميكية
+        $this->processDynamicMedia($request, $post);
+
         // Save the updated post
         $post->save();
+        
+        // إرجاع البيانات مع الصور
+        $post->load('media');
+        $post->dynamic_media = $this->formatDynamicMedia($post);
 
         return HelperFunc::sendResponse(200, 'Post updated successfully', $post);
     }
@@ -232,7 +248,7 @@ class AdminBlogController extends BaseController
     {
         try {
             // البحث عن المنشور مع العلاقة
-            $blog = Blog::with('type')->findOrFail($id);
+            $blog = Blog::with(['type', 'media'])->findOrFail($id);
 
             // فك تشفير الحقول المخزنة كـ JSON (مثل الصور)
             $images     = $blog->image;
@@ -249,6 +265,9 @@ class AdminBlogController extends BaseController
 
             $blog->image      = $images;
             $blog->main_image = $mainImages;
+            
+            // إضافة الصور الديناميكية
+            $blog->dynamic_media = $this->formatDynamicMedia($blog);
 
             // إرجاع التفاصيل بنجاح
             return HelperFunc::sendResponse(200, 'Blog details retrieved successfully', $blog);
@@ -267,6 +286,142 @@ class AdminBlogController extends BaseController
         $blog->save();
         return HelperFunc::sendResponse(200, 'Post updated successfully', $blog->status);
 
+    }
+
+    /**
+     * معالجة الصور الديناميكية - يقبل أي حقل وأي لغة
+     */
+    private function processDynamicMedia(Request $request, Blog $blog)
+    {
+        if (!$request->has('media')) {
+            return;
+        }
+
+        $mediaData = $request->input('media', []);
+        $languages = ['en', 'de', 'fr', 'it', 'ar'];
+        
+        // معالجة كل حقل
+        foreach ($mediaData as $fieldName => $languagesData) {
+            if (!is_array($languagesData)) {
+                continue;
+            }
+
+            // معالجة كل لغة
+            foreach ($languagesData as $language => $files) {
+                // التحقق من أن اللغة صحيحة
+                if (!in_array($language, $languages)) {
+                    continue;
+                }
+
+                // إذا كان ملف واحد فقط (ليس array)
+                if ($request->hasFile("media.{$fieldName}.{$language}")) {
+                    $file = $request->file("media.{$fieldName}.{$language}");
+                    $this->saveMediaFile($blog, $fieldName, $language, $file, 0);
+                }
+                // إذا كان array من الملفات (أكثر من صورة لنفس الحقل واللغة)
+                elseif (is_array($files)) {
+                    foreach ($files as $order => $file) {
+                        if ($request->hasFile("media.{$fieldName}.{$language}.{$order}")) {
+                            $uploadedFile = $request->file("media.{$fieldName}.{$language}.{$order}");
+                            $this->saveMediaFile($blog, $fieldName, $language, $uploadedFile, $order);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * حفظ ملف في جدول blog_media
+     */
+    private function saveMediaFile(Blog $blog, $fieldName, $language, $file, $order = 0)
+    {
+        // حذف الصورة القديمة إذا كانت موجودة (نفس الحقل + نفس اللغة + نفس الترتيب)
+        BlogMedia::where('blog_id', $blog->id)
+            ->where('field_name', $fieldName)
+            ->where('language', $language)
+            ->where('order', $order)
+            ->delete();
+
+        // رفع الملف
+        $filePath = HelperFunc::uploadFile('/images', $file);
+        
+        // تحديد نوع الملف
+        $fileType = $this->getFileType($file);
+        
+        // حفظ في قاعدة البيانات
+        BlogMedia::create([
+            'blog_id' => $blog->id,
+            'field_name' => $fieldName,
+            'language' => $language,
+            'file_path' => $filePath,
+            'file_name' => $file->getClientOriginalName(),
+            'file_type' => $fileType,
+            'file_size' => round($file->getSize() / 1024), // بالـ KB
+            'order' => $order,
+            'metadata' => null,
+        ]);
+    }
+
+    /**
+     * تحديد نوع الملف
+     */
+    private function getFileType($file)
+    {
+        $mimeType = $file->getMimeType();
+        
+        if (str_starts_with($mimeType, 'image/')) {
+            return 'image';
+        } elseif (str_starts_with($mimeType, 'video/')) {
+            return 'video';
+        } else {
+            return 'document';
+        }
+    }
+
+    /**
+     * تنسيق الصور الديناميكية للعرض
+     */
+    private function formatDynamicMedia(Blog $blog)
+    {
+        $media = $blog->media()->orderBy('field_name')->orderBy('language')->orderBy('order')->get();
+        
+        if ($media->isEmpty()) {
+            return null; // إذا مفيش صور، نرجع null
+        }
+        
+        $formatted = [];
+        
+        foreach ($media as $item) {
+            if (!isset($formatted[$item->field_name])) {
+                $formatted[$item->field_name] = [];
+            }
+            
+            if (!isset($formatted[$item->field_name][$item->language])) {
+                $formatted[$item->field_name][$item->language] = [];
+            }
+            
+            $formatted[$item->field_name][$item->language][] = [
+                'id' => $item->id,
+                'file_path' => asset($item->file_path),
+                'file_name' => $item->file_name,
+                'file_type' => $item->file_type,
+                'file_size' => $item->file_size,
+                'order' => $item->order,
+                'metadata' => $item->metadata,
+            ];
+        }
+        
+        // إذا كان في صورة واحدة فقط لكل حقل و لغة، نرجعها مباشرة
+        foreach ($formatted as $fieldName => $languages) {
+            foreach ($languages as $language => $images) {
+                if (count($images) === 1) {
+                    $formatted[$fieldName][$language] = $images[0];
+                }
+            }
+        }
+        
+        return $formatted;
     }
 
 }

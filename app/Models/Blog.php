@@ -28,4 +28,23 @@ class Blog extends Model
     {
         return $this->belongsTo(Type::class, 'type_id');
     }
+
+    public function media()
+    {
+        return $this->hasMany(BlogMedia::class);
+    }
+
+    /**
+     * جلب الصور لحقل معين و لغة معينة
+     */
+    public function getMediaByField($fieldName, $language = null)
+    {
+        $query = $this->media()->where('field_name', $fieldName);
+        
+        if ($language) {
+            $query->where('language', $language);
+        }
+        
+        return $query->orderBy('order')->get();
+    }
 }

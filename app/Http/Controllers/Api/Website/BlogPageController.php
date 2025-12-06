@@ -18,7 +18,7 @@ class BlogPageController extends Controller
     {
         $language = $request->get('lang', 'en'); // Default to 'en' if no language is provided
         App::setLocale($language);
-        $blog = Blog::whereRaw("JSON_SEARCH(slug, 'one', ?) IS NOT NULL", [$slug])
+        $blog = Blog::with('media')->whereRaw("JSON_SEARCH(slug, 'one', ?) IS NOT NULL", [$slug])
             ->firstOrFail();
         return HelperFunc::sendResponse(200, 'done', new BlogPageResource($blog));
     }
@@ -29,7 +29,7 @@ class BlogPageController extends Controller
         App::setLocale($language);
         $data['page'] = BlogsPage::first();
         // جلب أحدث ثلاث مدونات
-        $data['lastBlogPosts'] = Blog::with('type.typeDitaliServices')->where('status', 1)
+        $data['lastBlogPosts'] = Blog::with(['type.typeDitaliServices', 'media'])->where('status', 1)
             ->select('id', 'type_id', 'slug', 'image', 'short_description', 'title')
             ->orderBy('created_at', 'desc')
             ->take(3)
@@ -37,11 +37,11 @@ class BlogPageController extends Controller
 
         // جلب جميع الخدمات مع المدونات المرتبطة بها
         $data['allServesesBlogs'] = Type::with(['blogs' => function ($query) {
-            $query->where('status', 1)
+                $query->where('status', 1)
                 ->select('id', 'slug', 'type_id', 'image', 'short_description', 'title', 'created_at')
                 ->orderBy('created_at', 'desc')
                 ->take(6);
-        }, 'typeDitaliServices'])
+        }, 'blogs.media', 'typeDitaliServices'])
             ->get();
 
         return HelperFunc::sendResponse(200, 'done', new BlogsPageResource((object) $data));
