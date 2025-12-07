@@ -63,6 +63,10 @@ Route::prefix('user')->group(function () {
         Route::delete('/answers/{answer_id}/files/{file_id}', [OfferQuestionController::class, 'deleteFile']);
     });
 
+    // Get Questions by Type ID
+    Route::get('/types/{type_id}/questions', [App\Http\Controllers\Api\User\TypeQuestionController::class, 'getQuestions']);
+
+
 });
 
 Route::prefix('user')->middleware(['guest'])->group(function () {

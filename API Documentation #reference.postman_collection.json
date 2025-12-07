@@ -12519,6 +12519,33 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Get Questions by Type",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{url compas test}}/api/user/types/1/questions",
+							"host": [
+								"{{url compas test}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"types",
+								"1",
+								"questions"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
