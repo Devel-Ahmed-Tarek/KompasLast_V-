@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Website;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -8,11 +8,13 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class QuestionResource extends JsonResource
 {
     protected $lang;
+    protected $includeChildren;
 
-    public function __construct($resource, $lang = 'en')
+    public function __construct($resource, $lang = 'en', $includeChildren = false)
     {
         parent::__construct($resource);
         $this->lang = $lang;
+        $this->includeChildren = $includeChildren;
     }
 
     /**
@@ -60,6 +62,15 @@ class QuestionResource extends JsonResource
             'order' => $this->order,
             'parent_question_id' => $this->parent_question_id,
             'parent_option_id' => $this->parent_option_id,
+
+            // Child Questions (nested) - فقط إذا كان includeChildren = true
+            'children' => $this->when($this->includeChildren && $this->relationLoaded('childQuestions'), function () use ($lang, $request) {
+                return $this->childQuestions->map(function ($childQuestion) use ($lang, $request) {
+                    $childResource = new QuestionResource($childQuestion, $lang, false); // لا نضيف children للـ children
+                    return $childResource->toArray($request);
+                });
+            }, []),
         ];
     }
 }
+

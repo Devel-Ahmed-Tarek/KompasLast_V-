@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\QuestionResource;
+use App\Http\Resources\Website\QuestionResource;
 use App\Models\Type;
 use App\Models\TypeQuestion;
 use Illuminate\Http\Request;
