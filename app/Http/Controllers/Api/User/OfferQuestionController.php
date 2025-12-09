@@ -177,6 +177,16 @@ class OfferQuestionController extends Controller
         App::setLocale($lang);
 
         $answers = $offer->answers->map(function ($answer) use ($lang) {
+            // التحقق من الملفات
+            $filesCount = $answer->files->count();
+            if ($filesCount > 0) {
+                Log::info("Answer {$answer->id} has {$filesCount} files", [
+                    'answer_id' => $answer->id,
+                    'question_id' => $answer->question_id,
+                    'files' => $answer->files->pluck('file_name')->toArray()
+                ]);
+            }
+
             return [
                 'question_id' => $answer->question_id,
                 'question_text' => $answer->question->getTranslation('question_text', $lang),
@@ -401,6 +411,13 @@ class OfferQuestionController extends Controller
                     'file_size' => $file->getSize(),
                 ]);
 
+                Log::info('File saved to database', [
+                    'file_id' => $uploadedFile->id,
+                    'offer_answer_id' => $answer->id,
+                    'file_path' => $filePath,
+                    'file_name' => $uploadedFile->file_name
+                ]);
+
                 $uploadedFiles[] = [
                     'id' => $uploadedFile->id,
                     'file_name' => $uploadedFile->file_name,
@@ -615,26 +632,22 @@ class OfferQuestionController extends Controller
                         // التحقق من أن هذا السؤال
                         $fileQuestionId = null;
 
-                        // محاولة الحصول على question_id من البيانات
-                        if (is_array($answerFiles) && isset($answerFiles['question_id'])) {
-                            // هذا غير ممكن لأن الملفات لا تحتوي على question_id
-                        }
-
                         // محاولة الحصول على question_id من input
                         if ($request->has("answers.{$key}.question_id")) {
                             $fileQuestionId = $request->input("answers.{$key}.question_id");
-                        } elseif (isset($answersInput[$key]['question_id'])) {
+                        } elseif (isset($answersInput[$key]) && is_array($answersInput[$key]) && isset($answersInput[$key]['question_id'])) {
                             $fileQuestionId = $answersInput[$key]['question_id'];
                         }
 
                         if ($fileQuestionId == $questionId && isset($answerFiles['files'])) {
                             $files = is_array($answerFiles['files']) ? $answerFiles['files'] : [$answerFiles['files']];
+                            Log::info("Found files for question {$questionId} using allFiles method", ['count' => count($files)]);
                             break;
                         }
                     }
                 }
 
-                // محاولة أخرى: البحث مباشرة باستخدام hasFile
+                // محاولة أخرى: البحث مباشرة باستخدام hasFile مع dot notation
                 if (empty($files)) {
                     foreach ($answersInput as $key => $answerData) {
                         $currentQuestionId = null;
@@ -649,10 +662,48 @@ class OfferQuestionController extends Controller
                                 if (!is_array($files)) {
                                     $files = [$files];
                                 }
+                                Log::info("Found files for question {$questionId} using dot notation", ['count' => count($files)]);
+                                break;
+                            }
+
+                            // محاولة أخرى: البحث باستخدام array notation
+                            if ($request->hasFile("answers[{$key}][files]")) {
+                                $files = $request->file("answers[{$key}][files]");
+                                if (!is_array($files)) {
+                                    $files = [$files];
+                                }
+                                Log::info("Found files for question {$questionId} using array notation", ['count' => count($files)]);
                                 break;
                             }
                         }
                     }
+                }
+
+                // محاولة أخيرة: البحث في جميع الملفات باستخدام question_id مباشرة
+                if (empty($files) && isset($allFiles['answers'])) {
+                    // البحث في جميع المفاتيح
+                    foreach ($allFiles['answers'] as $key => $answerFiles) {
+                        // الحصول على question_id من input
+                        $fileQuestionId = null;
+                        if (isset($answersInput[$key]) && is_array($answersInput[$key]) && isset($answersInput[$key]['question_id'])) {
+                            $fileQuestionId = $answersInput[$key]['question_id'];
+                        } elseif ($request->has("answers.{$key}.question_id")) {
+                            $fileQuestionId = $request->input("answers.{$key}.question_id");
+                        }
+
+                        if ($fileQuestionId == $questionId && isset($answerFiles['files'])) {
+                            $files = is_array($answerFiles['files']) ? $answerFiles['files'] : [$answerFiles['files']];
+                            Log::info("Found files for question {$questionId} using final method", ['count' => count($files)]);
+                            break;
+                        }
+                    }
+                }
+
+                if (empty($files) && $question->allows_file_upload) {
+                    Log::warning("No files found for question {$questionId} even though file upload is allowed", [
+                        'allFiles_keys' => array_keys($allFiles['answers'] ?? []),
+                        'answersInput_keys' => array_keys($answersInput)
+                    ]);
                 }
 
                 // إنشاء أو تحديث الإجابة
