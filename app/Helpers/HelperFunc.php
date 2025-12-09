@@ -1,6 +1,8 @@
 <?php
+
 namespace App\Helpers;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 class HelperFunc
@@ -21,7 +23,54 @@ class HelperFunc
     {
         $extension = strtolower($file->getClientOriginalExtension());
         $name      = time() . rand(100, 999) . '.' . $extension;
-        return (string) $file->move('uploads/' . $path, $name);
+        $destinationPath = 'uploads/' . $path;
+
+        // إنشاء المجلد إذا لم يكن موجوداً
+        if (!file_exists(public_path($destinationPath))) {
+            mkdir(public_path($destinationPath), 0755, true);
+        }
+
+        // محاولة نقل الملف
+        try {
+            $moved = $file->move(public_path($destinationPath), $name);
+            if ($moved) {
+                return $destinationPath . '/' . $name;
+            }
+        } catch (\Exception $e) {
+            // إذا فشل move، نحاول copy
+            \Log::warning('File move failed, trying copy: ' . $e->getMessage());
+        }
+
+        // محاولة نسخ الملف بدلاً من نقله
+        try {
+            $realPath = $file->getRealPath();
+            if ($realPath && is_readable($realPath)) {
+                $destination = public_path($destinationPath . '/' . $name);
+                if (copy($realPath, $destination)) {
+                    return $destinationPath . '/' . $name;
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('File copy failed: ' . $e->getMessage());
+        }
+
+        // محاولة أخيرة: قراءة المحتوى وكتابته
+        try {
+            $realPath = $file->getRealPath();
+            if ($realPath && is_readable($realPath)) {
+                $content = file_get_contents($realPath);
+                if ($content !== false) {
+                    $destination = public_path($destinationPath . '/' . $name);
+                    if (file_put_contents($destination, $content) !== false) {
+                        return $destinationPath . '/' . $name;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('File write failed: ' . $e->getMessage());
+        }
+
+        throw new \Exception('Failed to upload file: ' . ($file->getClientOriginalName() ?? 'unknown'));
     }
 
     public static function deleteFile($file)
@@ -138,5 +187,4 @@ class HelperFunc
             ],
         ]));
     }
-
 }

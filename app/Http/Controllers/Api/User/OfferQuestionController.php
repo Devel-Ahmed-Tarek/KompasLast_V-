@@ -373,22 +373,64 @@ class OfferQuestionController extends Controller
 
         foreach ($files as $file) {
             // التحقق من أن الملف موجود وصالح
-            if (!$file || !$file->isValid()) {
-                continue; // تخطي الملفات غير الصالحة
-            }
-
-            // التحقق من أن الملف قابل للقراءة
-            if (!is_readable($file->getRealPath())) {
-                Log::warning('File is not readable: ' . $file->getRealPath());
+            if (!$file) {
+                Log::warning('File is null');
                 continue;
             }
 
+            // التحقق من أن الملف صالح
+            if (!$file->isValid()) {
+                Log::warning('File is not valid: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                continue;
+            }
+
+            // الحصول على المسار الحقيقي للملف
+            $realPath = null;
             try {
+                $realPath = $file->getRealPath();
+            } catch (\Exception $e) {
+                Log::warning('Cannot get real path: ' . $e->getMessage());
+            }
+
+            // التحقق من أن الملف قابل للقراءة
+            if (!$realPath || !is_readable($realPath)) {
+                Log::warning('File is not readable: ' . ($realPath ?? 'unknown path') . ' - Original: ' . ($file->getClientOriginalName() ?? 'unknown'));
+
+                // محاولة استخدام getPathname بدلاً من getRealPath
+                try {
+                    $pathname = $file->getPathname();
+                    if ($pathname && is_readable($pathname)) {
+                        $realPath = $pathname;
+                        Log::info('Using pathname instead: ' . $pathname);
+                    } else {
+                        continue;
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Cannot get pathname: ' . $e->getMessage());
+                    continue;
+                }
+            }
+
+            try {
+                // نسخ محتوى الملف إلى متغير قبل الرفع (لضمان عدم فقدان الملف)
+                $fileContent = null;
+                try {
+                    $fileContent = file_get_contents($realPath);
+                    if ($fileContent === false) {
+                        Log::error('Cannot read file content: ' . $realPath);
+                        continue;
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error reading file content: ' . $e->getMessage());
+                    continue;
+                }
+
                 // تحديد نوع الملف
                 $fileType = $this->getFileType($file);
 
                 // التحقق من نوع الملف المسموح
                 if (!in_array($fileType, $allowedTypes)) {
+                    Log::info('File type not allowed: ' . $fileType);
                     continue; // تخطي الملفات غير المسموحة
                 }
 
@@ -397,7 +439,7 @@ class OfferQuestionController extends Controller
 
                 // التحقق من أن الملف تم رفعه بنجاح
                 if (!$filePath || !file_exists(public_path($filePath))) {
-                    Log::error('File upload failed: ' . $file->getClientOriginalName());
+                    Log::error('File upload failed: ' . $file->getClientOriginalName() . ' - Path: ' . ($filePath ?? 'null'));
                     continue;
                 }
 
