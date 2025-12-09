@@ -5,13 +5,20 @@ namespace App\Http\Controllers\Api\User;
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Website\QuestionResource;
+use App\Mail\OfferCreated;
+use App\Models\ConfigApp;
 use App\Models\Offer;
 use App\Models\OfferAnswer;
 use App\Models\OfferAnswerFile;
+use App\Models\Shopping_list;
 use App\Models\TypeQuestion;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Stevebauman\Location\Facades\Location;
 
 class OfferQuestionController extends Controller
 {
@@ -400,6 +407,322 @@ class OfferQuestionController extends Controller
             return 'video';
         } else {
             return 'document';
+        }
+    }
+
+    /**
+     * إرسال الفورم الكامل مع إنشاء Offer وجمع كل الإجابات
+     */
+    public function submitOfferForm(Request $request)
+    {
+        $lang = $request->get('lang', 'en');
+        App::setLocale($lang);
+
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'type_id' => 'required|exists:types,id',
+            'answers' => 'required|array',
+            'answers.*.question_id' => 'required|exists:type_questions,id',
+            'answers.*.answer' => 'nullable|string',
+            'answers.*.option_ids' => 'nullable|array',
+            'answers.*.option_ids.*' => 'exists:question_options,id',
+            'answers.*.files' => 'nullable|array',
+            'answers.*.files.*' => 'file',
+
+            // بيانات الـ Offer (optional - يمكن أن تكون موجودة أو لا)
+            'name' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'date' => 'nullable|date',
+            'adresse' => 'nullable|string|max:255',
+            'ort' => 'nullable|string|max:255',
+            'zimmer' => 'nullable|string|max:255',
+            'etage' => 'nullable|string|max:255',
+            'vorhanden' => 'nullable|string|max:255',
+            'Nach_Adresse' => 'nullable|string|max:255',
+            'Nach_Ort' => 'nullable|string|max:255',
+            'Nach_Zimmer' => 'nullable|string|max:255',
+            'Nach_Etage' => 'nullable|string|max:255',
+            'Nach_vorhanden' => 'nullable|string|max:255',
+            'count' => 'nullable|integer|min:0',
+            'Besonderheiten' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'zipcode' => 'nullable|string|max:255',
+            'Nach_country' => 'nullable|string|max:255',
+            'Nach_zipcode' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // التحقق من أن جميع الأسئلة تنتمي لنفس الـ Type
+            $typeId = $request->type_id;
+            $questionIds = collect($request->answers)->pluck('question_id')->unique();
+
+            $questions = TypeQuestion::whereIn('id', $questionIds)
+                ->where('type_id', $typeId)
+                ->get();
+
+            if ($questions->count() !== $questionIds->count()) {
+                return HelperFunc::sendResponse(400, 'Some questions do not belong to this service type', []);
+            }
+
+            // إنشاء أو تحديث الـ Offer
+            $offerData = [
+                'type_id' => $typeId,
+                'name' => $request->name ?? 'Guest User',
+                'email' => $request->email ?? 'guest@example.com',
+                'phone' => $request->phone ?? '',
+                'date' => $request->date ?? now(),
+                'adresse' => $request->adresse ?? '',
+                'ort' => $request->ort ?? '',
+                'zimmer' => $request->zimmer ?? '',
+                'etage' => $request->etage ?? '',
+                'zipcode' => $request->zipcode ?? '',
+                'vorhanden' => $request->vorhanden ?? '',
+                'Nach_Adresse' => $request->Nach_Adresse ?? null,
+                'Nach_Ort' => $request->Nach_Ort ?? null,
+                'Nach_Zimmer' => $request->Nach_Zimmer ?? null,
+                'Nach_Etage' => $request->Nach_Etage ?? null,
+                'Nach_vorhanden' => $request->Nach_vorhanden ?? null,
+                'Nach_country' => $request->Nach_country ?? null,
+                'Nach_zipcode' => $request->Nach_zipcode ?? null,
+                'count' => $request->count ?? 1,
+                'Number_of_offers' => $request->count ?? 1,
+                'Besonderheiten' => $this->filterBesonderheiten($request->Besonderheiten ?? null),
+                'ip' => $this->getClientIp($request),
+                'country' => $request->country ?? $this->getCountryFromIP($this->getClientIp($request)),
+                'city' => $request->city ?? $this->getCityFromIP($this->getClientIp($request)),
+                'lang' => $lang,
+                'cheek' => true,
+                'completion_status' => 'completed',
+            ];
+
+            // التحقق من إعدادات النظام
+            $config = ConfigApp::first();
+            $status = true;
+            if ($config && $config->offer_flow == 1) {
+                $status = false;
+            }
+
+            if ($config && $config->add_offer == 1) {
+                return HelperFunc::sendResponse(403, 'Offer creation is currently disabled', []);
+            }
+
+            $offerData['status'] = $status;
+
+            // إنشاء الـ Offer
+            $offer = Offer::create($offerData);
+
+            // حفظ كل الإجابات مرتبة
+            $savedAnswers = [];
+            foreach ($request->answers as $answerData) {
+                $question = $questions->firstWhere('id', $answerData['question_id']);
+
+                if (!$question) {
+                    continue;
+                }
+
+                // إنشاء أو تحديث الإجابة
+                $answer = OfferAnswer::updateOrCreate(
+                    [
+                        'offer_id' => $offer->id,
+                        'question_id' => $question->id
+                    ],
+                    [
+                        'answer_text' => $answerData['answer'] ?? null,
+                    ]
+                );
+
+                // حفظ الاختيارات (options)
+                if (isset($answerData['option_ids']) && !empty($answerData['option_ids'])) {
+                    $answer->options()->sync($answerData['option_ids']);
+                }
+
+                // رفع الملفات إذا كانت موجودة
+                if ($question->allows_file_upload && isset($answerData['files']) && !empty($answerData['files'])) {
+                    $this->uploadAnswerFiles($answer, $answerData['files'], $question);
+                }
+
+                $savedAnswers[] = [
+                    'question_id' => $question->id,
+                    'answer_id' => $answer->id,
+                ];
+            }
+
+            // تشغيل bayOffer إذا كان موجود
+            $this->bayOffer($offer->id);
+
+            // إرسال البريد الإلكتروني
+            if ($request->email) {
+                try {
+                    Mail::to($request->email)->send(new OfferCreated($lang));
+                } catch (\Exception $e) {
+                    // تجاهل خطأ البريد الإلكتروني
+                }
+            }
+
+            // إرسال إشعار للـ Admins
+            try {
+                $admins = User::where('role', 'admin')->where('available_notification', '1')->get();
+                HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offer->id, [
+                    'en' => 'A new offer "' . $offer->name . '" has been created',
+                    'de' => 'Ein neues Angebot "' . $offer->name . '" wurde erstellt',
+                ]);
+            } catch (\Exception $e) {
+                // تجاهل خطأ الإشعارات
+            }
+
+            DB::commit();
+
+            // جلب الـ Offer مع الإجابات
+            $offer->load(['answers.question', 'answers.options', 'answers.files']);
+
+            return HelperFunc::sendResponse(201, 'Offer and answers submitted successfully', [
+                'offer' => [
+                    'id' => $offer->id,
+                    'type_id' => $offer->type_id,
+                    'name' => $offer->name,
+                    'email' => $offer->email,
+                    'phone' => $offer->phone,
+                    'completion_status' => $offer->completion_status,
+                    'created_at' => $offer->created_at,
+                ],
+                'answers_count' => count($savedAnswers),
+                'answers' => $offer->answers->map(function ($answer) use ($lang) {
+                    return [
+                        'question_id' => $answer->question_id,
+                        'question_text' => $answer->question->getTranslation('question_text', $lang),
+                        'answer_text' => $answer->answer_text,
+                        'selected_options' => $answer->options->map(function ($option) use ($lang) {
+                            return [
+                                'id' => $option->id,
+                                'option_text' => $option->getTranslation('option_text', $lang),
+                            ];
+                        }),
+                        'files' => $answer->files->map(function ($file) {
+                            return [
+                                'id' => $file->id,
+                                'file_name' => $file->file_name,
+                                'file_type' => $file->file_type,
+                                'file_url' => $file->file_url,
+                                'file_size' => $file->file_size,
+                            ];
+                        }),
+                    ];
+                }),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
+        }
+    }
+
+    /**
+     * Helper methods
+     */
+    private function getClientIp(Request $request)
+    {
+        $ip = $request->header('X-Forwarded-For');
+        if ($ip) {
+            $ip = explode(',', $ip)[0];
+        } else {
+            $ip = $request->ip();
+        }
+        return trim($ip);
+    }
+
+    private function getCountryFromIP($ip)
+    {
+        try {
+            $position = Location::get($ip);
+            return $position->countryName ?? 'Unknown';
+        } catch (\Exception $e) {
+            return 'Unknown';
+        }
+    }
+
+    private function getCityFromIP($ip)
+    {
+        try {
+            $position = Location::get($ip);
+            return $position->cityName ?? 'Unknown';
+        } catch (\Exception $e) {
+            return 'Unknown';
+        }
+    }
+
+    private function filterBesonderheiten($besonderheiten)
+    {
+        if (!$besonderheiten) {
+            return null;
+        }
+
+        $patterns = [
+            '/\b(\+?\d{1,3}[-.\s]?)?(\(?\d{1,4}\)?[-.\s]?)?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b/',
+            '/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/',
+            '/\b\d+\s[A-Za-z]+\s(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|Boulevard|Blvd|Drive|Dr|Court|Ct|Way|Square|Sq|Place|Pl|Terrace|Terr|Parkway|Pkwy)\b/i',
+            '/\b\d+\s[A-Za-z]+\b/',
+        ];
+
+        return preg_replace($patterns, '*****', $besonderheiten);
+    }
+
+    private function bayOffer($offer_id)
+    {
+        try {
+            $offer = Offer::with('type')->find($offer_id);
+
+            if (!$offer || !$offer->type) {
+                return;
+            }
+
+            $today = now()->format('Y-m-d');
+
+            $companies = User::where('role', 'company')
+                ->where('ban', '0')
+                ->where('status', '1')
+                ->whereHas('companyDetails', function ($query) {
+                    $query->where('sucsses', '1');
+                })
+                ->whereHas('typesComapny', function ($query) use ($offer) {
+                    $query->where('type_id', $offer->type_id);
+                })
+                ->withCount([
+                    'shopping_list as shopping_list_count' => function ($query) use ($today) {
+                        $query->where('type', 'D')
+                            ->whereDate('created_at', $today);
+                    },
+                ])
+                ->get();
+
+            $companies->each(function ($company) {
+                $company->shopping_list_count = $company->shopping_list_count ?? 0;
+            });
+
+            $filteredCompanies = $companies->filter(function ($company) use ($offer) {
+                $amountTotal = $company->wallet->amount ?? 0;
+                $expenseTotal = $company->wallet->expense ?? 0;
+                $totalMoneyInWallet = $amountTotal - $expenseTotal;
+
+                return $totalMoneyInWallet >= ($offer->type->price / $offer->Number_of_offers);
+            });
+
+            $sortedCompanies = $filteredCompanies->sortBy('shopping_list_count');
+
+            foreach ($sortedCompanies as $company) {
+                Shopping_list::create([
+                    'offer_id' => $offer->id,
+                    'user_id' => $company->id,
+                    'type' => 'D',
+                ]);
+            }
+        } catch (\Exception $e) {
+            // تجاهل الأخطاء في bayOffer
         }
     }
 }

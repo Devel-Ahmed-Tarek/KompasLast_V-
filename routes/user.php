@@ -52,6 +52,9 @@ Route::prefix('user')->group(function () {
     Route::get('/offers/{id}/info', [OfferExecutionController::class, 'getInfoOffer']);
     Route::post('/offers/announcements', [OfferExecutionController::class, 'storeAnnouncement']);
 
+    // Submit Offer Form (Complete Form Submission)
+    Route::post('/offers/submit-form', [OfferQuestionController::class, 'submitOfferForm']);
+
     // Offer Questions Routes
     Route::prefix('offers/{offer_id}')->group(function () {
         Route::get('/questions/first', [OfferQuestionController::class, 'getFirstQuestion']);
@@ -65,8 +68,6 @@ Route::prefix('user')->group(function () {
 
     // Get Questions by Type ID
     Route::get('/types/{type_id}/questions', [App\Http\Controllers\Api\User\TypeQuestionController::class, 'getQuestions']);
-
-
 });
 
 Route::prefix('user')->middleware(['guest'])->group(function () {

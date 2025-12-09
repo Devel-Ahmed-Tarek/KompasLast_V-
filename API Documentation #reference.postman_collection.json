@@ -12721,6 +12721,57 @@
 					"response": []
 				},
 				{
+					"name": "Submit Offer Form (Complete Form Submission)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"type_id\": 1,\n    \"lang\": \"en\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+1234567890\",\n    \"adresse\": \"123 Main St\",\n    \"ort\": \"New York\",\n    \"zimmer\": \"3\",\n    \"etage\": \"2\",\n    \"vorhanden\": \"Yes\",\n    \"count\": 1,\n    \"answers\": [\n        {\n            \"question_id\": 1,\n            \"answer\": \"My answer text\",\n            \"option_ids\": [1, 2]\n        },\n        {\n            \"question_id\": 2,\n            \"answer\": \"Another answer\",\n            \"option_ids\": [3]\n        },\n        {\n            \"question_id\": 5,\n            \"option_ids\": [10]\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://backend.kompassumzug.ch/api/user/offers/submit-form?lang=en",
+							"protocol": "https",
+							"host": [
+								"backend",
+								"kompassumzug",
+								"ch"
+							],
+							"path": [
+								"api",
+								"user",
+								"offers",
+								"submit-form"
+							],
+							"query": [
+								{
+									"key": "lang",
+									"value": "en",
+									"description": "Language: en, de, fr, it, ar"
+								}
+							]
+						},
+						"description": "Submit complete offer form with all answers at once. Creates a new offer and stores all answers in an organized way. Supports file uploads for questions that allow file uploads.\n\n**Request Body:**\n- `type_id` (required): Service type ID\n- `lang` (optional): Language code (en, de, fr, it, ar)\n- `answers` (required): Array of answers, each containing:\n  - `question_id` (required): Question ID\n  - `answer` (optional): Text answer\n  - `option_ids` (optional): Array of selected option IDs\n  - `files` (optional): Array of files (for questions that allow file uploads)\n- Offer data fields (all optional): name, email, phone, adresse, ort, zimmer, etage, vorhanden, count, etc.\n\n**Response:**\nReturns the created offer with all answers organized by question, including file information if files were uploaded."
+					},
+					"response": []
+				},
+				{
 					"name": "Update Answer",
 					"request": {
 						"method": "PUT",
