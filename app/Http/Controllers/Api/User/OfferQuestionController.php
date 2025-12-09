@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Stevebauman\Location\Facades\Location;
@@ -361,34 +362,56 @@ class OfferQuestionController extends Controller
         $uploadedFiles = [];
 
         foreach ($files as $file) {
-            // تحديد نوع الملف
-            $fileType = $this->getFileType($file);
-
-            // التحقق من نوع الملف المسموح
-            if (!in_array($fileType, $allowedTypes)) {
-                continue; // تخطي الملفات غير المسموحة
+            // التحقق من أن الملف موجود وصالح
+            if (!$file || !$file->isValid()) {
+                continue; // تخطي الملفات غير الصالحة
             }
 
-            // رفع الملف
-            $filePath = HelperFunc::uploadFile('offer-answers', $file);
+            // التحقق من أن الملف قابل للقراءة
+            if (!is_readable($file->getRealPath())) {
+                Log::warning('File is not readable: ' . $file->getRealPath());
+                continue;
+            }
 
-            // حفظ معلومات الملف
-            $uploadedFile = OfferAnswerFile::create([
-                'offer_answer_id' => $answer->id,
-                'file_path' => $filePath,
-                'file_name' => $file->getClientOriginalName(),
-                'file_type' => $fileType,
-                'mime_type' => $file->getMimeType(),
-                'file_size' => $file->getSize(),
-            ]);
+            try {
+                // تحديد نوع الملف
+                $fileType = $this->getFileType($file);
 
-            $uploadedFiles[] = [
-                'id' => $uploadedFile->id,
-                'file_name' => $uploadedFile->file_name,
-                'file_type' => $uploadedFile->file_type,
-                'file_url' => $uploadedFile->file_url,
-                'file_size' => $uploadedFile->file_size,
-            ];
+                // التحقق من نوع الملف المسموح
+                if (!in_array($fileType, $allowedTypes)) {
+                    continue; // تخطي الملفات غير المسموحة
+                }
+
+                // رفع الملف
+                $filePath = HelperFunc::uploadFile('offer-answers', $file);
+
+                // التحقق من أن الملف تم رفعه بنجاح
+                if (!$filePath || !file_exists(public_path($filePath))) {
+                    Log::error('File upload failed: ' . $file->getClientOriginalName());
+                    continue;
+                }
+
+                // حفظ معلومات الملف
+                $uploadedFile = OfferAnswerFile::create([
+                    'offer_answer_id' => $answer->id,
+                    'file_path' => $filePath,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_type' => $fileType,
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+
+                $uploadedFiles[] = [
+                    'id' => $uploadedFile->id,
+                    'file_name' => $uploadedFile->file_name,
+                    'file_type' => $uploadedFile->file_type,
+                    'file_url' => $uploadedFile->file_url,
+                    'file_size' => $uploadedFile->file_size,
+                ];
+            } catch (\Exception $e) {
+                Log::error('Error uploading file: ' . $e->getMessage());
+                continue; // تخطي الملفات التي فشل رفعها
+            }
         }
 
         return $uploadedFiles;
@@ -652,11 +675,37 @@ class OfferQuestionController extends Controller
                 if ($question->allows_file_upload && !empty($files)) {
                     // تصفية الملفات الصالحة فقط
                     $validFiles = array_filter($files, function ($file) {
-                        return $file && $file->isValid();
+                        if (!$file) {
+                            return false;
+                        }
+
+                        // التحقق من أن الملف صالح
+                        if (!$file->isValid()) {
+                            Log::warning('Invalid file: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                            return false;
+                        }
+
+                        // التحقق من أن الملف قابل للقراءة
+                        try {
+                            $realPath = $file->getRealPath();
+                            if (!$realPath || !is_readable($realPath)) {
+                                Log::warning('File is not readable: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                                return false;
+                            }
+                            return true;
+                        } catch (\Exception $e) {
+                            Log::warning('Error checking file: ' . $e->getMessage());
+                            return false;
+                        }
                     });
 
                     if (!empty($validFiles)) {
-                        $this->uploadAnswerFiles($answer, $validFiles, $question);
+                        try {
+                            $this->uploadAnswerFiles($answer, $validFiles, $question);
+                        } catch (\Exception $e) {
+                            Log::error('Error uploading files for question ' . $question->id . ': ' . $e->getMessage());
+                            // لا نوقف العملية، نكمل مع باقي الإجابات
+                        }
                     }
                 }
 
