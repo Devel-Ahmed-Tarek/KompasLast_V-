@@ -459,15 +459,29 @@ class OfferQuestionController extends Controller
         try {
             DB::beginTransaction();
 
-            // التحقق من أن جميع الأسئلة تنتمي لنفس الـ Type
+            // معالجة form-data: جمع جميع question_ids من البيانات
             $typeId = $request->type_id;
-            $questionIds = collect($request->answers)->pluck('question_id')->unique();
+            $questionIds = [];
+
+            // جمع question_ids من answers
+            if ($request->has('answers')) {
+                $answers = $request->input('answers', []);
+                foreach ($answers as $key => $answerData) {
+                    if (is_array($answerData) && isset($answerData['question_id'])) {
+                        $questionIds[] = $answerData['question_id'];
+                    } elseif (is_numeric($key) && $request->has("answers.{$key}.question_id")) {
+                        $questionIds[] = $request->input("answers.{$key}.question_id");
+                    }
+                }
+            }
+
+            $questionIds = array_unique($questionIds);
 
             $questions = TypeQuestion::whereIn('id', $questionIds)
                 ->where('type_id', $typeId)
                 ->get();
 
-            if ($questions->count() !== $questionIds->count()) {
+            if ($questions->count() !== count($questionIds)) {
                 return HelperFunc::sendResponse(400, 'Some questions do not belong to this service type', []);
             }
 
@@ -520,11 +534,102 @@ class OfferQuestionController extends Controller
 
             // حفظ كل الإجابات مرتبة
             $savedAnswers = [];
-            foreach ($request->answers as $answerData) {
-                $question = $questions->firstWhere('id', $answerData['question_id']);
+            $allFiles = $request->allFiles(); // الحصول على جميع الملفات
+
+            // معالجة answers من form-data
+            $answersInput = $request->input('answers', []);
+
+            foreach ($questionIds as $questionId) {
+                $question = $questions->firstWhere('id', $questionId);
 
                 if (!$question) {
                     continue;
+                }
+
+                // البحث عن بيانات الإجابة لهذا السؤال
+                $answerText = null;
+                $optionIds = [];
+                $files = [];
+
+                // البحث في answers array
+                foreach ($answersInput as $key => $answerData) {
+                    $currentQuestionId = null;
+
+                    // الحصول على question_id
+                    if (is_array($answerData) && isset($answerData['question_id'])) {
+                        $currentQuestionId = $answerData['question_id'];
+                    } elseif (is_numeric($key) && $request->has("answers.{$key}.question_id")) {
+                        $currentQuestionId = $request->input("answers.{$key}.question_id");
+                    }
+
+                    // إذا كان هذا السؤال المطلوب
+                    if ($currentQuestionId == $questionId) {
+                        // الحصول على الإجابة النصية
+                        if (is_array($answerData) && isset($answerData['answer'])) {
+                            $answerText = $answerData['answer'];
+                        } elseif ($request->has("answers.{$key}.answer")) {
+                            $answerText = $request->input("answers.{$key}.answer");
+                        }
+
+                        // الحصول على option_ids
+                        if (is_array($answerData) && isset($answerData['option_ids']) && is_array($answerData['option_ids'])) {
+                            $optionIds = $answerData['option_ids'];
+                        } elseif ($request->has("answers.{$key}.option_ids")) {
+                            $optionIds = $request->input("answers.{$key}.option_ids", []);
+                            if (!is_array($optionIds)) {
+                                $optionIds = [$optionIds];
+                            }
+                        }
+
+                        break;
+                    }
+                }
+
+                // البحث عن الملفات لهذا السؤال من allFiles
+                // Laravel يحول answers[28][files][0] إلى ['answers' => [28 => ['files' => [0 => file]]]]
+                if (isset($allFiles['answers'])) {
+                    foreach ($allFiles['answers'] as $key => $answerFiles) {
+                        // التحقق من أن هذا السؤال
+                        $fileQuestionId = null;
+
+                        // محاولة الحصول على question_id من البيانات
+                        if (is_array($answerFiles) && isset($answerFiles['question_id'])) {
+                            // هذا غير ممكن لأن الملفات لا تحتوي على question_id
+                        }
+
+                        // محاولة الحصول على question_id من input
+                        if ($request->has("answers.{$key}.question_id")) {
+                            $fileQuestionId = $request->input("answers.{$key}.question_id");
+                        } elseif (isset($answersInput[$key]['question_id'])) {
+                            $fileQuestionId = $answersInput[$key]['question_id'];
+                        }
+
+                        if ($fileQuestionId == $questionId && isset($answerFiles['files'])) {
+                            $files = is_array($answerFiles['files']) ? $answerFiles['files'] : [$answerFiles['files']];
+                            break;
+                        }
+                    }
+                }
+
+                // محاولة أخرى: البحث مباشرة باستخدام hasFile
+                if (empty($files)) {
+                    foreach ($answersInput as $key => $answerData) {
+                        $currentQuestionId = null;
+                        if (is_array($answerData) && isset($answerData['question_id'])) {
+                            $currentQuestionId = $answerData['question_id'];
+                        }
+
+                        if ($currentQuestionId == $questionId) {
+                            // محاولة الحصول على الملفات باستخدام hasFile
+                            if ($request->hasFile("answers.{$key}.files")) {
+                                $files = $request->file("answers.{$key}.files");
+                                if (!is_array($files)) {
+                                    $files = [$files];
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 // إنشاء أو تحديث الإجابة
@@ -534,18 +639,25 @@ class OfferQuestionController extends Controller
                         'question_id' => $question->id
                     ],
                     [
-                        'answer_text' => $answerData['answer'] ?? null,
+                        'answer_text' => $answerText,
                     ]
                 );
 
                 // حفظ الاختيارات (options)
-                if (isset($answerData['option_ids']) && !empty($answerData['option_ids'])) {
-                    $answer->options()->sync($answerData['option_ids']);
+                if (!empty($optionIds)) {
+                    $answer->options()->sync($optionIds);
                 }
 
                 // رفع الملفات إذا كانت موجودة
-                if ($question->allows_file_upload && isset($answerData['files']) && !empty($answerData['files'])) {
-                    $this->uploadAnswerFiles($answer, $answerData['files'], $question);
+                if ($question->allows_file_upload && !empty($files)) {
+                    // تصفية الملفات الصالحة فقط
+                    $validFiles = array_filter($files, function ($file) {
+                        return $file && $file->isValid();
+                    });
+
+                    if (!empty($validFiles)) {
+                        $this->uploadAnswerFiles($answer, $validFiles, $question);
+                    }
                 }
 
                 $savedAnswers[] = [
