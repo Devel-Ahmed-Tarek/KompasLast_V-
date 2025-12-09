@@ -378,9 +378,11 @@ class OfferQuestionController extends Controller
                 continue;
             }
 
+            $fileName = $file->getClientOriginalName() ?? 'unknown';
+
             // التحقق من أن الملف صالح
             if (!$file->isValid()) {
-                Log::warning('File is not valid: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                Log::warning('File is not valid: ' . $fileName);
                 continue;
             }
 
@@ -394,7 +396,7 @@ class OfferQuestionController extends Controller
 
             // التحقق من أن الملف قابل للقراءة
             if (!$realPath || !is_readable($realPath)) {
-                Log::warning('File is not readable: ' . ($realPath ?? 'unknown path') . ' - Original: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                Log::warning('File is not readable: ' . ($realPath ?? 'unknown path') . ' - Original: ' . $fileName);
 
                 // محاولة استخدام getPathname بدلاً من getRealPath
                 try {
@@ -412,14 +414,32 @@ class OfferQuestionController extends Controller
             }
 
             try {
-                // نسخ محتوى الملف إلى متغير قبل الرفع (لضمان عدم فقدان الملف)
+                // قراءة محتوى الملف فوراً قبل أن يتم حذفه من /tmp
                 $fileContent = null;
+                $fileSize = null;
+                $mimeType = null;
+
                 try {
+                    Log::info('Reading file content immediately', [
+                        'file_name' => $fileName,
+                        'real_path' => $realPath,
+                        'file_size' => $file->getSize()
+                    ]);
+
                     $fileContent = file_get_contents($realPath);
                     if ($fileContent === false) {
                         Log::error('Cannot read file content: ' . $realPath);
                         continue;
                     }
+
+                    $fileSize = strlen($fileContent);
+                    $mimeType = $file->getMimeType();
+
+                    Log::info('File content read successfully', [
+                        'file_name' => $fileName,
+                        'content_size' => $fileSize,
+                        'mime_type' => $mimeType
+                    ]);
                 } catch (\Exception $e) {
                     Log::error('Error reading file content: ' . $e->getMessage());
                     continue;
@@ -434,12 +454,48 @@ class OfferQuestionController extends Controller
                     continue; // تخطي الملفات غير المسموحة
                 }
 
-                // رفع الملف
-                $filePath = HelperFunc::uploadFile('offer-answers', $file);
+                // حفظ الملف مباشرة من المحتوى بدلاً من استخدام move()
+                $extension = strtolower($file->getClientOriginalExtension() ?: pathinfo($fileName, PATHINFO_EXTENSION));
+                $name = time() . rand(100, 999) . '.' . $extension;
+                $destinationPath = 'uploads/offer-answers';
+                $destination = public_path($destinationPath . '/' . $name);
 
-                // التحقق من أن الملف تم رفعه بنجاح
-                if (!$filePath || !file_exists(public_path($filePath))) {
-                    Log::error('File upload failed: ' . $file->getClientOriginalName() . ' - Path: ' . ($filePath ?? 'null'));
+                // إنشاء المجلد إذا لم يكن موجوداً
+                if (!file_exists(public_path($destinationPath))) {
+                    mkdir(public_path($destinationPath), 0755, true);
+                }
+
+                Log::info('Writing file content to destination', [
+                    'file_name' => $fileName,
+                    'destination' => $destination,
+                    'content_size' => $fileSize
+                ]);
+
+                // كتابة المحتوى مباشرة
+                $written = file_put_contents($destination, $fileContent);
+
+                if ($written === false || $written !== $fileSize) {
+                    Log::error('Failed to write file content', [
+                        'file_name' => $fileName,
+                        'destination' => $destination,
+                        'expected_size' => $fileSize,
+                        'written_size' => $written
+                    ]);
+                    continue;
+                }
+
+                $filePath = $destinationPath . '/' . $name;
+
+                Log::info('File written successfully', [
+                    'file_name' => $fileName,
+                    'file_path' => $filePath,
+                    'file_size' => $fileSize,
+                    'written_size' => $written
+                ]);
+
+                // التحقق من أن الملف تم حفظه بنجاح
+                if (!file_exists(public_path($filePath))) {
+                    Log::error('File does not exist after write: ' . $filePath);
                     continue;
                 }
 
@@ -447,20 +503,20 @@ class OfferQuestionController extends Controller
                 Log::info('Saving file to database', [
                     'offer_answer_id' => $answer->id,
                     'file_path' => $filePath,
-                    'file_name' => $file->getClientOriginalName(),
+                    'file_name' => $fileName,
                     'file_type' => $fileType,
-                    'mime_type' => $file->getMimeType(),
-                    'file_size' => $file->getSize(),
-                    'file_size_mb' => round($file->getSize() / 1024 / 1024, 2)
+                    'mime_type' => $mimeType,
+                    'file_size' => $fileSize,
+                    'file_size_mb' => round($fileSize / 1024 / 1024, 2)
                 ]);
 
                 $uploadedFile = OfferAnswerFile::create([
                     'offer_answer_id' => $answer->id,
                     'file_path' => $filePath,
-                    'file_name' => $file->getClientOriginalName(),
+                    'file_name' => $fileName,
                     'file_type' => $fileType,
-                    'mime_type' => $file->getMimeType(),
-                    'file_size' => $file->getSize(),
+                    'mime_type' => $mimeType,
+                    'file_size' => $fileSize,
                 ]);
 
                 Log::info('File saved to database successfully', [
