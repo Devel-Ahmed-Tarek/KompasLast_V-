@@ -444,6 +444,16 @@ class OfferQuestionController extends Controller
                 }
 
                 // حفظ معلومات الملف
+                Log::info('Saving file to database', [
+                    'offer_answer_id' => $answer->id,
+                    'file_path' => $filePath,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_type' => $fileType,
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                    'file_size_mb' => round($file->getSize() / 1024 / 1024, 2)
+                ]);
+
                 $uploadedFile = OfferAnswerFile::create([
                     'offer_answer_id' => $answer->id,
                     'file_path' => $filePath,
@@ -453,11 +463,15 @@ class OfferQuestionController extends Controller
                     'file_size' => $file->getSize(),
                 ]);
 
-                Log::info('File saved to database', [
+                Log::info('File saved to database successfully', [
                     'file_id' => $uploadedFile->id,
                     'offer_answer_id' => $answer->id,
                     'file_path' => $filePath,
-                    'file_name' => $uploadedFile->file_name
+                    'file_name' => $uploadedFile->file_name,
+                    'file_url' => $uploadedFile->file_url,
+                    'file_type' => $uploadedFile->file_type,
+                    'file_size' => $uploadedFile->file_size,
+                    'database_record' => $uploadedFile->toArray()
                 ]);
 
                 $uploadedFiles[] = [
@@ -541,6 +555,13 @@ class OfferQuestionController extends Controller
         try {
             DB::beginTransaction();
 
+            Log::info('=== Starting Offer Form Submission ===', [
+                'type_id' => $request->type_id,
+                'name' => $request->name,
+                'email' => $request->email,
+                'lang' => $lang
+            ]);
+
             // معالجة form-data: جمع جميع question_ids من البيانات
             $typeId = $request->type_id;
             $questionIds = [];
@@ -548,6 +569,11 @@ class OfferQuestionController extends Controller
             // جمع question_ids من answers
             if ($request->has('answers')) {
                 $answers = $request->input('answers', []);
+                Log::info('Answers input received', [
+                    'answers_count' => count($answers),
+                    'answers_keys' => array_keys($answers)
+                ]);
+
                 foreach ($answers as $key => $answerData) {
                     if (is_array($answerData) && isset($answerData['question_id'])) {
                         $questionIds[] = $answerData['question_id'];
@@ -558,6 +584,10 @@ class OfferQuestionController extends Controller
             }
 
             $questionIds = array_unique($questionIds);
+            Log::info('Question IDs collected', [
+                'question_ids' => $questionIds,
+                'count' => count($questionIds)
+            ]);
 
             $questions = TypeQuestion::whereIn('id', $questionIds)
                 ->where('type_id', $typeId)
@@ -611,15 +641,49 @@ class OfferQuestionController extends Controller
 
             $offerData['status'] = $status;
 
+            Log::info('=== Creating Offer ===', [
+                'offer_data' => $offerData,
+                'status' => $status
+            ]);
+
             // إنشاء الـ Offer
             $offer = Offer::create($offerData);
+
+            Log::info('Offer created successfully', [
+                'offer_id' => $offer->id,
+                'type_id' => $offer->type_id,
+                'name' => $offer->name,
+                'email' => $offer->email,
+                'phone' => $offer->phone,
+                'completion_status' => $offer->completion_status,
+                'created_at' => $offer->created_at
+            ]);
 
             // حفظ كل الإجابات مرتبة
             $savedAnswers = [];
             $allFiles = $request->allFiles(); // الحصول على جميع الملفات
 
+            Log::info('=== Processing Answers ===', [
+                'offer_id' => $offer->id,
+                'total_questions' => count($questionIds),
+                'allFiles_keys' => array_keys($allFiles),
+                'allFiles_structure' => array_map(function ($key) use ($allFiles) {
+                    return [
+                        'key' => $key,
+                        'type' => gettype($allFiles[$key] ?? null),
+                        'is_array' => is_array($allFiles[$key] ?? null)
+                    ];
+                }, array_keys($allFiles))
+            ]);
+
             // معالجة answers من form-data
             $answersInput = $request->input('answers', []);
+
+            Log::info('Answers input structure', [
+                'answers_count' => count($answersInput),
+                'answers_keys' => array_keys($answersInput),
+                'answers_sample' => array_slice($answersInput, 0, 3, true) // أول 3 إجابات فقط للعرض
+            ]);
 
             foreach ($questionIds as $questionId) {
                 $question = $questions->firstWhere('id', $questionId);
@@ -748,6 +812,16 @@ class OfferQuestionController extends Controller
                     ]);
                 }
 
+                Log::info('=== Processing Answer ===', [
+                    'question_id' => $question->id,
+                    'question_text' => $question->getTranslation('question_text', 'en'),
+                    'question_type' => $question->question_type,
+                    'answer_text' => $answerText,
+                    'option_ids' => $optionIds,
+                    'files_count' => count($files),
+                    'allows_file_upload' => $question->allows_file_upload
+                ]);
+
                 // إنشاء أو تحديث الإجابة
                 $answer = OfferAnswer::updateOrCreate(
                     [
@@ -759,6 +833,13 @@ class OfferQuestionController extends Controller
                     ]
                 );
 
+                Log::info('Answer saved', [
+                    'answer_id' => $answer->id,
+                    'offer_id' => $answer->offer_id,
+                    'question_id' => $answer->question_id,
+                    'answer_text' => $answer->answer_text
+                ]);
+
                 // حفظ الاختيارات (options)
                 if (!empty($optionIds)) {
                     $answer->options()->sync($optionIds);
@@ -766,15 +847,49 @@ class OfferQuestionController extends Controller
 
                 // رفع الملفات إذا كانت موجودة
                 if ($question->allows_file_upload && !empty($files)) {
+                    Log::info('=== Processing Files for Question ===', [
+                        'question_id' => $question->id,
+                        'question_text' => $question->getTranslation('question_text', 'en'),
+                        'files_count' => count($files),
+                        'allows_file_upload' => $question->allows_file_upload,
+                        'allowed_file_types' => $question->allowed_file_types,
+                        'max_files' => $question->max_files,
+                        'max_file_size' => $question->max_file_size
+                    ]);
+
+                    // تسجيل معلومات كل ملف قبل التصفية
+                    foreach ($files as $index => $file) {
+                        if ($file) {
+                            Log::info("File #{$index} Details", [
+                                'file_name' => $file->getClientOriginalName(),
+                                'file_size' => $file->getSize(),
+                                'mime_type' => $file->getMimeType(),
+                                'is_valid' => $file->isValid(),
+                                'real_path' => $file->getRealPath() ?? 'N/A',
+                                'pathname' => $file->getPathname() ?? 'N/A',
+                                'is_readable' => $file->getRealPath() ? is_readable($file->getRealPath()) : false
+                            ]);
+                        } else {
+                            Log::warning("File #{$index} is null");
+                        }
+                    }
+
                     // تصفية الملفات الصالحة فقط
-                    $validFiles = array_filter($files, function ($file) {
+                    $validFiles = array_filter($files, function ($file) use ($question) {
                         if (!$file) {
+                            Log::warning('File is null, skipping');
                             return false;
                         }
 
+                        $fileName = $file->getClientOriginalName() ?? 'unknown';
+
                         // التحقق من أن الملف صالح
                         if (!$file->isValid()) {
-                            Log::warning('Invalid file: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                            Log::warning('Invalid file', [
+                                'file_name' => $fileName,
+                                'error_code' => $file->getError(),
+                                'error_message' => $file->getErrorMessage()
+                            ]);
                             return false;
                         }
 
@@ -782,23 +897,83 @@ class OfferQuestionController extends Controller
                         try {
                             $realPath = $file->getRealPath();
                             if (!$realPath || !is_readable($realPath)) {
-                                Log::warning('File is not readable: ' . ($file->getClientOriginalName() ?? 'unknown'));
+                                Log::warning('File is not readable', [
+                                    'file_name' => $fileName,
+                                    'real_path' => $realPath ?? 'N/A',
+                                    'is_readable' => $realPath ? is_readable($realPath) : false
+                                ]);
                                 return false;
                             }
+
+                            // التحقق من حجم الملف
+                            $fileSize = $file->getSize();
+                            $maxSize = ($question->max_file_size ?? 10) * 1024 * 1024; // تحويل من MB إلى bytes
+                            if ($fileSize > $maxSize) {
+                                Log::warning('File size exceeds maximum', [
+                                    'file_name' => $fileName,
+                                    'file_size' => $fileSize,
+                                    'max_size' => $maxSize,
+                                    'file_size_mb' => round($fileSize / 1024 / 1024, 2),
+                                    'max_size_mb' => $question->max_file_size
+                                ]);
+                                return false;
+                            }
+
+                            Log::info('File is valid and ready for upload', [
+                                'file_name' => $fileName,
+                                'file_size' => $fileSize,
+                                'file_size_mb' => round($fileSize / 1024 / 1024, 2),
+                                'mime_type' => $file->getMimeType()
+                            ]);
+
                             return true;
                         } catch (\Exception $e) {
-                            Log::warning('Error checking file: ' . $e->getMessage());
+                            Log::warning('Error checking file', [
+                                'file_name' => $fileName,
+                                'error' => $e->getMessage()
+                            ]);
                             return false;
                         }
                     });
 
+                    Log::info('Files validation completed', [
+                        'question_id' => $question->id,
+                        'total_files' => count($files),
+                        'valid_files' => count($validFiles),
+                        'invalid_files' => count($files) - count($validFiles)
+                    ]);
+
                     if (!empty($validFiles)) {
                         try {
-                            $this->uploadAnswerFiles($answer, $validFiles, $question);
+                            Log::info('Starting file upload process', [
+                                'question_id' => $question->id,
+                                'answer_id' => $answer->id,
+                                'valid_files_count' => count($validFiles)
+                            ]);
+
+                            $uploadedFiles = $this->uploadAnswerFiles($answer, $validFiles, $question);
+
+                            Log::info('File upload completed', [
+                                'question_id' => $question->id,
+                                'answer_id' => $answer->id,
+                                'uploaded_files_count' => count($uploadedFiles),
+                                'uploaded_files' => $uploadedFiles
+                            ]);
                         } catch (\Exception $e) {
-                            Log::error('Error uploading files for question ' . $question->id . ': ' . $e->getMessage());
+                            Log::error('Error uploading files for question', [
+                                'question_id' => $question->id,
+                                'answer_id' => $answer->id,
+                                'error' => $e->getMessage(),
+                                'trace' => $e->getTraceAsString()
+                            ]);
                             // لا نوقف العملية، نكمل مع باقي الإجابات
                         }
+                    } else {
+                        Log::warning('No valid files to upload', [
+                            'question_id' => $question->id,
+                            'answer_id' => $answer->id,
+                            'total_files' => count($files)
+                        ]);
                     }
                 }
 
@@ -833,8 +1008,36 @@ class OfferQuestionController extends Controller
 
             DB::commit();
 
+            Log::info('=== Transaction Committed ===', [
+                'offer_id' => $offer->id,
+                'saved_answers_count' => count($savedAnswers),
+                'saved_answers' => $savedAnswers
+            ]);
+
             // جلب الـ Offer مع الإجابات
             $offer->load(['answers.question', 'answers.options', 'answers.files']);
+
+            Log::info('=== Final Offer Data ===', [
+                'offer_id' => $offer->id,
+                'total_answers' => $offer->answers->count(),
+                'answers_with_files' => $offer->answers->filter(function ($answer) {
+                    return $answer->files->count() > 0;
+                })->map(function ($answer) {
+                    return [
+                        'answer_id' => $answer->id,
+                        'question_id' => $answer->question_id,
+                        'files_count' => $answer->files->count(),
+                        'files' => $answer->files->map(function ($file) {
+                            return [
+                                'file_id' => $file->id,
+                                'file_name' => $file->file_name,
+                                'file_path' => $file->file_path,
+                                'file_url' => $file->file_url
+                            ];
+                        })->toArray()
+                    ];
+                })->values()->toArray()
+            ]);
 
             return HelperFunc::sendResponse(201, 'Offer and answers submitted successfully', [
                 'offer' => [
