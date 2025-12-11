@@ -1,8 +1,10 @@
 <?php
+
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\OfferWithAnswersResource;
 use App\Models\ConfigApp;
 use App\Models\Offer;
 use Carbon\Carbon;
@@ -20,7 +22,7 @@ class AdminOfferController extends Controller
             $today = Carbon::today()->toDateString();
             $now   = Carbon::now();
 
-                                                     // Get the filter from the request
+            // Get the filter from the request
             $filterType = $request->input('filter'); // e.g., "24_hours", "purchased", "not_purchased"
 
             // Start the query
@@ -47,7 +49,7 @@ class AdminOfferController extends Controller
                 });
             }
 
-                                                                   // Paginate the filtered offers
+            // Paginate the filtered offers
             $offers = $query->orderBy('id', 'desc')->paginate(10); // 10 offers per page
 
             // Return paginated offers using the helper
@@ -60,8 +62,14 @@ class AdminOfferController extends Controller
     // Show a specific offer
     public function show($id)
     {
-        $offer = Offer::with('type')->findOrFail($id); // Get the offer by ID
-        return response()->json($offer);
+        $offer = Offer::with([
+            'type',
+            'answers.question',
+            'answers.options',
+            'answers.files'
+        ])->findOrFail($id); // Get the offer by ID with questions and answers
+
+        return new OfferWithAnswersResource($offer);
     }
 
     public function store(Request $request)
@@ -173,7 +181,7 @@ class AdminOfferController extends Controller
             // عناوين الشوارع (بسيطة مثل: "123 Main St" أو "42 Elm Street")
             '/\b\d+\s[A-Za-z]+\s(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|Boulevard|Blvd|Drive|Dr|Court|Ct|Way|Square|Sq|Place|Pl|Terrace|Terr|Parkway|Pkwy)\b/i',
 
-                                    // أي نمط آخر يشتبه في كونه عنوانًا أو رقمًا
+            // أي نمط آخر يشتبه في كونه عنوانًا أو رقمًا
             '/\b\d+\s[A-Za-z]+\b/', // مثل "123 Main"
         ];
 
