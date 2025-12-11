@@ -15,7 +15,7 @@ class OfferWithAnswersResource extends JsonResource
     public function toArray(Request $request): array
     {
         $lang = $request->get('lang', 'en');
-        
+
         return [
             'id' => $this->id,
             'type_id' => $this->type_id,
@@ -29,14 +29,12 @@ class OfferWithAnswersResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'date' => $this->date,
-            'answers' => OfferAnswerResource::collection($this->whenLoaded('answers'))->map(function($resource) use ($lang) {
-                return $resource->toArray($request);
-            }),
+            'answers' => OfferAnswerResource::collection($this->whenLoaded('answers')),
             'progress' => [
                 'answered' => $this->answers->count(),
                 'total' => $this->type->mainQuestions()->count(),
-                'percentage' => $this->type->mainQuestions()->count() > 0 
-                    ? round(($this->answers->count() / $this->type->mainQuestions()->count()) * 100, 2) 
+                'percentage' => $this->type->mainQuestions()->count() > 0
+                    ? round(($this->answers->count() / $this->type->mainQuestions()->count()) * 100, 2)
                     : 0,
             ],
             'created_at' => $this->created_at,
