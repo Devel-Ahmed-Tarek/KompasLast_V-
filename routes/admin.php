@@ -129,6 +129,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
         Route::get('/', [AdminReviewSiteController::class, 'index']);
         Route::post('/', [AdminReviewSiteController::class, 'store']);
         Route::get('/overview', [AdminReviewSiteController::class, 'overview']);
+        Route::put('/{id}', [AdminReviewSiteController::class, 'update']);
         Route::delete('/{id}', [AdminReviewSiteController::class, 'destroy']);
         Route::put('/{id}/status', [AdminReviewSiteController::class, 'updateStatus']);
     });

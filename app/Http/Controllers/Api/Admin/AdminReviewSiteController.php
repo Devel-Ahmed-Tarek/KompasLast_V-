@@ -29,6 +29,30 @@ class AdminReviewSiteController extends Controller
 
         return HelperFunc::sendResponse(201, 'Review added successfully', $review);
     }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $review = ReviewSite::findOrFail($id);
+
+            $validatedData = $request->validate([
+                'name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|email|max:255',
+                'stars' => 'sometimes|required|integer|min:1|max:5',
+                'comment' => 'sometimes|required|string',
+                'status' => 'sometimes|boolean',
+            ]);
+
+            $review->update($validatedData);
+
+            return HelperFunc::sendResponse(200, 'Review updated successfully', $review);
+        } catch (ModelNotFoundException $e) {
+            return HelperFunc::sendResponse(404, 'Review not found');
+        } catch (\Exception $e) {
+            return HelperFunc::sendResponse(500, 'An error occurred while updating the review: ' . $e->getMessage());
+        }
+    }
+
     public function updateStatus(Request $request, $id)
     {
         $review = ReviewSite::findOrFail($id);
@@ -113,5 +137,4 @@ class AdminReviewSiteController extends Controller
             return HelperFunc::sendResponse(500, 'An error occurred while deleting the review');
         }
     }
-
 }
