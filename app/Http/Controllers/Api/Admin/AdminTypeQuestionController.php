@@ -40,6 +40,7 @@ class AdminTypeQuestionController extends Controller
             'question_text.ar' => 'nullable|string',
             'question_type' => 'required|in:text,single_choice,multi_choice,number,date,email,phone',
             'is_required' => 'nullable|boolean',
+            'show_before_purchase' => 'nullable|boolean',
             'allows_file_upload' => 'nullable|boolean',
             'allowed_file_types' => 'nullable', // يقبل string أو array
             'max_files' => 'nullable|integer|min:1',
@@ -68,6 +69,7 @@ class AdminTypeQuestionController extends Controller
             'question_text' => $request->question_text,
             'question_type' => $request->question_type,
             'is_required' => $request->is_required ?? true,
+            'show_before_purchase' => $request->show_before_purchase ?? false,
             'allows_file_upload' => $request->allows_file_upload ?? false,
             'allowed_file_types' => $allowedFileTypes,
             'max_files' => $request->max_files ?? 10,
@@ -106,6 +108,7 @@ class AdminTypeQuestionController extends Controller
             'question_text.ar' => 'nullable|string',
             'question_type' => 'nullable|in:text,single_choice,multi_choice,number,date,email,phone',
             'is_required' => 'nullable|boolean',
+            'show_before_purchase' => 'nullable|boolean',
             'allows_file_upload' => 'nullable|boolean',
             'allowed_file_types' => 'nullable', // يقبل string أو array
             'max_files' => 'nullable|integer|min:1',
@@ -131,6 +134,7 @@ class AdminTypeQuestionController extends Controller
         $updateData = $request->only([
             'question_type',
             'is_required',
+            'show_before_purchase',
             'allows_file_upload',
             'max_files',
             'max_file_size',

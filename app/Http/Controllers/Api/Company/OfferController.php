@@ -1,9 +1,11 @@
 <?php
+
 namespace App\Http\Controllers\Api\Company;
 
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OfferShopResource;
+use App\Http\Resources\OfferWithAnswersResource;
 use App\Models\ConfigApp;
 use App\Models\Coupon;
 use App\Models\Offer;
@@ -54,7 +56,19 @@ class OfferController extends Controller
             ->whereDoesntHave('Shopping_list', function ($query) use ($currentCompanyId) {
                 // Ensure the offer is not in the shopping list of the current company
                 $query->where('user_id', $currentCompanyId);
-            });
+            })
+            ->with([
+                'type',
+                'answers' => function ($query) {
+                    // تحميل فقط الإجابات للأسئلة التي show_before_purchase = true
+                    $query->whereHas('question', function ($q) {
+                        $q->where('show_before_purchase', true);
+                    });
+                },
+                'answers.question',
+                'answers.options',
+                'answers.files'
+            ]);
 
         // Apply search functionality if the search parameter is provided
         if ($request->has('search')) {
@@ -189,7 +203,8 @@ class OfferController extends Controller
                     'company_id' => $user->id,
                     'coupon_id'  => $coupon->id,
                     'offer_id'   => $offer->id,
-                    'status'     => 'used']);
+                    'status'     => 'used'
+                ]);
             } else {
                 $expenseTotal += $offerPrice;
             }
@@ -206,7 +221,6 @@ class OfferController extends Controller
             ]);
             DB::commit();
             return HelperFunc::sendResponse(201, __('messages.offer_purchased_successfully'), []);
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Transaction failed: ' . $e->getMessage());
@@ -277,7 +291,13 @@ class OfferController extends Controller
 
         // استعلام العروض الخاصة بالمستخدم
         $query = Shopping_list::where('user_id', auth()->user()->id)
-            ->with('offer.type', 'fakeOffer');
+            ->with([
+                'offer.type',
+                'offer.answers.question',
+                'offer.answers.options',
+                'offer.answers.files',
+                'fakeOffer'
+            ]);
 
         if ($request->has('search')) {
             $search = $request->query('search');
@@ -296,9 +316,17 @@ class OfferController extends Controller
         }
 
         // ترتيب العروض وعرضها بشكل مقسم
-        $offers = $query->orderBy('id', 'desc')->paginate(10);
+        $shoppingLists = $query->orderBy('id', 'desc')->paginate(10);
 
-        return HelperFunc::pagination($offers, $offers->items());
+        // تحويل Shopping_list إلى Offers
+        $offers = $shoppingLists->getCollection()->map(function ($shoppingItem) {
+            return $shoppingItem->offer;
+        });
+
+        // استخدام Resource Collection
+        $offersResource = OfferWithAnswersResource::collection($offers);
+
+        return HelperFunc::pagination($shoppingLists, $offersResource);
     }
 
     public function singelOffer($offer_id)
@@ -311,23 +339,30 @@ class OfferController extends Controller
 
         $admins = User::where("role", "admin")->where('available_notification', '1')->get();
 
-        $offer = Shopping_list::where('user_id', auth()->user()->id)
+        $shoppingItem = Shopping_list::where('user_id', auth()->user()->id)
             ->where('offer_id', $offer_id)
-            ->with('offer.type')
+            ->with([
+                'offer.type',
+                'offer.answers.question',
+                'offer.answers.options',
+                'offer.answers.files'
+            ])
             ->first();
 
-        if (! $offer) {
+        if (! $shoppingItem || ! $shoppingItem->offer) {
             return HelperFunc::apiResponse(false, 204, ' Offer not found.');
         }
+
         Notification::send($admins, new \App\Notifications\PaymentNotification([
             'type'    => "companyOpenedOffer",
-            'type_id' => $offer->id,
+            'type_id' => $shoppingItem->id,
             'mgs'     => [
-                'en' => 'The company :' . $user->name . ' oppened the offer :' . $offer->offer->name,
-                "de" => "Die Firma: " . $user->name . " hat den Angebot: " . $offer->offer->name . " geoeffnet",
+                'en' => 'The company :' . $user->name . ' oppened the offer :' . $shoppingItem->offer->name,
+                "de" => "Die Firma: " . $user->name . " hat den Angebot: " . $shoppingItem->offer->name . " geoeffnet",
             ],
         ]));
-        return HelperFunc::apiResponse(true, 200, $offer);
+
+        return new OfferWithAnswersResource($shoppingItem->offer);
     }
 
     public function getCompletedOffer()

@@ -15,6 +15,7 @@ class TypeQuestion extends Model
         'question_text',
         'question_type',
         'is_required',
+        'show_before_purchase',
         'allows_file_upload',
         'allowed_file_types',
         'max_files',
@@ -31,6 +32,7 @@ class TypeQuestion extends Model
 
     protected $casts = [
         'is_required' => 'boolean',
+        'show_before_purchase' => 'boolean',
         'allows_file_upload' => 'boolean',
         'order' => 'integer',
         'max_files' => 'integer',

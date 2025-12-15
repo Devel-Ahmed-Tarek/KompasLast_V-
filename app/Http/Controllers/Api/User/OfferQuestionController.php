@@ -567,9 +567,18 @@ class OfferQuestionController extends Controller
      */
     public function submitOfferForm(Request $request)
     {
+
         $lang = $request->get('lang', 'en');
         App::setLocale($lang);
+        $config = ConfigApp::first();
 
+        if ($config->offer_flow == 1) {
+            $status = false;
+        }
+
+        if ($config->add_offer == 1) {
+            return HelperFunc::apiResponse(true, 200, ['message' => 'Offer Add Is Stoping']);
+        }
         // Validation rules
         $validator = Validator::make($request->all(), [
             'type_id' => 'required|exists:types,id',

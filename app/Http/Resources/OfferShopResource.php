@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
@@ -13,36 +14,68 @@ class OfferShopResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $lang = $request->get('lang', 'en');
+
+        // تصفية الإجابات للأسئلة التي show_before_purchase = true فقط
+        $answersBeforePurchase = [];
+        if ($this->relationLoaded('answers')) {
+            $answersBeforePurchase = $this->answers->filter(function ($answer) {
+                return $answer->relationLoaded('question') &&
+                    $answer->question &&
+                    $answer->question->show_before_purchase === true;
+            })->map(function ($answer) use ($lang) {
+                $result = [
+                    'id' => $answer->id,
+                    'question_id' => $answer->question_id,
+                    'question_text' => $answer->question->getTranslation('question_text', $lang),
+                    'question_type' => $answer->question->question_type,
+                    'answer_text' => $answer->answer_text,
+                ];
+
+                // إضافة الخيارات المحددة إذا كانت محملة
+                if ($answer->relationLoaded('options')) {
+                    $result['selected_options'] = $answer->options->map(function ($option) use ($lang) {
+                        return [
+                            'id' => $option->id,
+                            'option_text' => $option->getTranslation('option_text', $lang),
+                        ];
+                    })->values();
+                } else {
+                    $result['selected_options'] = [];
+                }
+
+                // إضافة الملفات إذا كانت محملة
+                if ($answer->relationLoaded('files')) {
+                    $result['files'] = $answer->files->map(function ($file) {
+                        return [
+                            'id' => $file->id,
+                            'file_name' => $file->file_name,
+                            'file_type' => $file->file_type,
+                            'file_url' => $file->file_url,
+                            'file_size' => $file->file_size,
+                            'mime_type' => $file->mime_type,
+                        ];
+                    })->values();
+                } else {
+                    $result['files'] = [];
+                }
+
+                return $result;
+            })->values();
+        }
+
         return [
-            'type_id'          => [
+            'type_id' => [
                 'id'    => $this->type_id,
-                'name'  => $this->type->name,
-                'price' => $this->Type->price / $this->Number_of_offers,
+                'name'  => $this->type->getTranslation('name', $lang),
+                'price' => $this->type->price / $this->Number_of_offers,
             ],
             'id'               => $this->id,
-            'name'             => $this->name,
-            'email'            => $this->email,
-            'phone'            => $this->phone,
             'date'             => $this->date,
-            'adresse'          => $this->adresse,
-            'ort'              => $this->ort,
-            'zimmer'           => $this->zimmer,
-            'etage'            => $this->etage,
             'Number_of_offers' => $this->Number_of_offers,
-            'vorhanden'        => $this->vorhanden,
-            'Nach_Adresse'     => $this->Nach_Adresse,
-            'Nach_Ort'         => $this->Nach_Ort,
-            'Nach_Zimmer'      => $this->Nach_Zimmer,
-            'Nach_Etage'       => $this->Nach_Etage,
-            'Nach_vorhanden'   => $this->Nach_vorhanden,
             'count'            => $this->count,
-            'Besonderheiten'   => $this->Besonderheiten,
-            'ip'               => $this->ip,
-            'country'          => $this->country,
-            'city'             => $this->city,
-            'lang'             => $this->lang,
-            'cheek'            => $this->cheek,
             'status'           => $this->status,
+            'answers'          => $answersBeforePurchase,
         ];
     }
 }
