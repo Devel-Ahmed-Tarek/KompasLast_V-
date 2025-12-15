@@ -242,6 +242,7 @@ class AdminTypeQuestionController extends Controller
         $data['allowed_file_types'] = $question->allowed_file_types ? explode(',', $question->allowed_file_types) : null;
         $data['max_files'] = $question->max_files;
         $data['max_file_size'] = $question->max_file_size;
+        $data['show_before_purchase'] = $question->show_before_purchase ?? false;
 
         // جلب الأسئلة الفرعية
         $childQuestions = TypeQuestion::where('parent_question_id', $question->id)
