@@ -48,7 +48,7 @@ class OfferController extends Controller
         // Query offers that are not yet purchased by the logged-in company
         $query = Offer::where('status', 1)
             ->where('count', '>', 0)
-            ->where('date', '>', now())
+            ->where('date', '>=', now())
             ->whereHas('type', function ($query) use ($currentCompany) {
                 // Check if the offer type is related to the current company
                 $query->whereIn('id', $currentCompany->typesComapny->pluck('id'));
