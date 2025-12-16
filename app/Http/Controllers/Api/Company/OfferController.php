@@ -46,9 +46,11 @@ class OfferController extends Controller
         ]));
 
         // Query offers that are not yet purchased by the logged-in company
+        // مقارنة التاريخ - بما أن date من نوع date فقط، نستخدم whereDate
+        // هذا سيعيد كل الـ offers التي تاريخها >= اليوم (يشمل نفس اليوم)
         $query = Offer::where('status', 1)
             ->where('count', '>', 0)
-            ->where('date', '>=', now())
+            ->whereDate('date', '>=', now()->format('Y-m-d'))
             ->whereHas('type', function ($query) use ($currentCompany) {
                 // Check if the offer type is related to the current company
                 $query->whereIn('id', $currentCompany->typesComapny->pluck('id'));
