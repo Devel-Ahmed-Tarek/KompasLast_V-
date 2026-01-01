@@ -96,6 +96,8 @@ class AdminTypeDitaliServicesController extends Controller
         try {
             $validated = $validator->validated();
             $nameType  = Type::find($validated['type_id'])->name;
+            // Ensure variable is defined even if no file is uploaded
+            $service_home_icon = null;
             if ($request->hasFile('service_home_icon')) {
                 $service_home_icon = HelperFunc::uploadFile('/images', $request->file('service_home_icon'));
             }
