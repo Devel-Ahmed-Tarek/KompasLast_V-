@@ -101,6 +101,8 @@ class AdminTypeDitaliServicesController extends Controller
             if ($request->hasFile('service_home_icon')) {
                 $service_home_icon = HelperFunc::uploadFile('/images', $request->file('service_home_icon'));
             }
+            // Safely handle optional meta_title translations
+            $meta_title = $validated['meta_title'] ?? [];
             $service = TypeDitaliServices::create([
                 'type_id'           => $validated['type_id'],
                 'small_image'       => [
@@ -124,7 +126,7 @@ class AdminTypeDitaliServicesController extends Controller
                 'tips_title'        => $validated['tips_title'],
                 'tips_subtitle'     => $validated['tips_subtitle'],
                 'meta_keys'         => $validated['meta_keys'],
-                'meta_title'        => $validated['meta_title'],
+                'meta_title'        => $meta_title,
                 'meta_description'  => $validated['meta_description'],
                 'slug'              => $nameType,
             ]);
