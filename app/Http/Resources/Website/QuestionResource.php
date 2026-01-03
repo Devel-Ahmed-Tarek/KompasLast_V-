@@ -50,7 +50,7 @@ class QuestionResource extends JsonResource
                         'id' => $option->id,
                         'option_text' => $option->getTranslation('option_text', $lang),
                         'order' => $option->order,
-                        'icon' => $option->icon ?? null,
+                        'icon' => $option->icon ? asset($option->icon) : null,
                     ];
                 });
             }, []),
