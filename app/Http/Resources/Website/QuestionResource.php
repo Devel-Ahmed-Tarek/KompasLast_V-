@@ -63,12 +63,17 @@ class QuestionResource extends JsonResource
             'parent_question_id' => $this->parent_question_id,
             'parent_option_id' => $this->parent_option_id,
 
-            // Child Questions (nested) - فقط إذا كان includeChildren = true
-            'children' => $this->when($this->includeChildren && $this->relationLoaded('childQuestions'), function () use ($lang, $request) {
-                return $this->childQuestions->map(function ($childQuestion) use ($lang, $request) {
-                    $childResource = new QuestionResource($childQuestion, $lang, false); // لا نضيف children للـ children
+            // Child Questions (nested) - recursive
+            'children' => $this->when($this->includeChildren, function () use ($lang, $request) {
+                // إذا لم تكن علاقة الأطفال محملة مسبقًا، قم بتحميلها مع خياراتها وأطفالها
+                $children = $this->relationLoaded('childQuestions')
+                    ? $this->childQuestions
+                    : $this->childQuestions()->with(['options', 'childQuestions.options'])->orderBy('order')->get();
+
+                return $children->map(function ($childQuestion) use ($lang, $request) {
+                    $childResource = new QuestionResource($childQuestion, $lang, true); // ✅ نسمح بالتقسيم المتكرر
                     return $childResource->toArray($request);
-                });
+                })->values();
             }, []),
         ];
     }
