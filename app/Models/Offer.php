@@ -71,12 +71,12 @@ class Offer extends Model
 
     public function countryRelation()
     {
-        return $this->belongsTo(Country::class);
+        return $this->belongsTo(Country::class, 'country_id');
     }
 
     public function cityRelation()
     {
-        return $this->belongsTo(City::class);
+        return $this->belongsTo(City::class, 'city_id');
     }
 
     // Accessor لحساب حالة الإكمال
