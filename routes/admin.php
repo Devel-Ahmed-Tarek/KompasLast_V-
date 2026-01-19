@@ -36,6 +36,8 @@ use App\Http\Controllers\Api\Admin\AdminTypeQuestionController;
 use App\Http\Controllers\Api\Admin\AdminQuestionOptionController;
 use App\Http\Controllers\Api\Admin\AdminVisitorController;
 use App\Http\Controllers\Api\Admin\ConfigAppController;
+use App\Http\Controllers\Api\Admin\AdminCountryController;
+use App\Http\Controllers\Api\Admin\AdminCityController;
 use App\Http\Controllers\Api\Admin\ServesPageFormController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\DashboardController;
@@ -277,4 +279,18 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::post('remove/types', [AdminCompanyController::class, 'deleteType']);
     Route::get('company/types/dont/haveing', [AdminCompanyController::class, 'gityourType']);
     Route::get('company/types/haveing', [AdminCompanyController::class, 'TypesHaveing']);
+
+    // Countries management
+    Route::get('countries', [AdminCountryController::class, 'index']);
+    Route::post('countries', [AdminCountryController::class, 'store']);
+    Route::get('countries/{id}', [AdminCountryController::class, 'show']);
+    Route::put('countries/{id}', [AdminCountryController::class, 'update']);
+    Route::delete('countries/{id}', [AdminCountryController::class, 'destroy']);
+
+    // Cities management
+    Route::get('cities', [AdminCityController::class, 'index']);
+    Route::post('cities', [AdminCityController::class, 'store']);
+    Route::get('cities/{id}', [AdminCityController::class, 'show']);
+    Route::put('cities/{id}', [AdminCityController::class, 'update']);
+    Route::delete('cities/{id}', [AdminCityController::class, 'destroy']);
 });
