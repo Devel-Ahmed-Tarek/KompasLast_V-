@@ -132,7 +132,7 @@ class AdminCityController extends Controller
         }
 
         $country = Country::with('cities')->find($country_id);
-        
+
         if (!$country) {
             return HelperFunc::sendResponse(404, 'Country not found', []);
         }

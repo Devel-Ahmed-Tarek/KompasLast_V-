@@ -1,0 +1,169 @@
+{
+  "title": "Get Cities by Country API Documentation",
+  "version": "1.0.0",
+  "description": "Endpoint to get all cities that belong to a specific country",
+  "endpoints": {
+    "company": {
+      "method": "GET",
+      "path": "/api/company/cities/by-country/{country_id}",
+      "description": "Get all cities for a specific country (Company API)",
+      "authentication": {
+        "type": "Bearer Token",
+        "required": true
+      },
+      "urlParameters": {
+        "country_id": {
+          "type": "integer",
+          "required": true,
+          "description": "The ID of the country",
+          "validation": "exists:countries,id"
+        }
+      },
+      "headers": {
+        "Authorization": "Bearer {token}",
+        "Accept": "application/json"
+      },
+      "response": {
+        "success": {
+          "status": 200,
+          "message": "Cities fetched successfully",
+          "data": {
+            "country": {
+              "id": "number",
+              "name": {
+                "en": "string",
+                "ar": "string",
+                "de": "string",
+                "fr": "string",
+                "it": "string"
+              }
+            },
+            "cities": [
+              {
+                "id": "number",
+                "country_id": "number",
+                "name": {
+                  "en": "string",
+                  "ar": "string",
+                  "de": "string",
+                  "fr": "string",
+                  "it": "string"
+                },
+                "created_at": "timestamp",
+                "updated_at": "timestamp"
+              }
+            ]
+          }
+        },
+        "errors": {
+          "404": {
+            "status": 404,
+            "message": "Country not found",
+            "data": []
+          },
+          "422": {
+            "status": 422,
+            "message": "Validation errors",
+            "data": {
+              "country_id": ["The selected country id is invalid."]
+            }
+          }
+        }
+      }
+    },
+    "admin": {
+      "method": "GET",
+      "path": "/api/admin/cities/by-country/{country_id}",
+      "description": "Get all cities for a specific country (Admin API)",
+      "authentication": {
+        "type": "Bearer Token",
+        "required": true
+      },
+      "urlParameters": {
+        "country_id": {
+          "type": "integer",
+          "required": true,
+          "description": "The ID of the country",
+          "validation": "exists:countries,id"
+        }
+      },
+      "headers": {
+        "Authorization": "Bearer {token}",
+        "Accept": "application/json"
+      },
+      "response": {
+        "success": {
+          "status": 200,
+          "message": "Cities fetched successfully",
+          "data": {
+            "country": {
+              "id": "number",
+              "name": {
+                "en": "string",
+                "ar": "string",
+                "de": "string",
+                "fr": "string",
+                "it": "string"
+              }
+            },
+            "cities": "array of city objects"
+          }
+        },
+        "errors": {
+          "404": {
+            "status": 404,
+            "message": "Country not found",
+            "data": []
+          },
+          "422": {
+            "status": 422,
+            "message": "Validation errors",
+            "data": {}
+          }
+        }
+      }
+    }
+  },
+  "useCases": [
+    "Dropdown selection flow - populate cities dropdown when country is selected",
+    "Display country with all its cities",
+    "Filter cities by country before showing available cities to subscribe"
+  ],
+  "exampleUsage": {
+    "javascript": {
+      "basic": "const response = await axios.get(`/api/company/cities/by-country/${countryId}`, { headers: { 'Authorization': `Bearer ${token}` } });",
+      "react": "const { country, cities, loading, error } = useCitiesByCountry(countryId, token);",
+      "vue": "await this.fetchCitiesByCountry(countryId);"
+    },
+    "curl": {
+      "company": "curl -X GET 'http://your-domain.com/api/company/cities/by-country/1' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Accept: application/json'",
+      "admin": "curl -X GET 'http://your-domain.com/api/admin/cities/by-country/1' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Accept: application/json'"
+    }
+  },
+  "integration": {
+    "relatedEndpoints": [
+      "GET /api/company/countries/available",
+      "GET /api/company/cities/available",
+      "POST /api/company/cities/add"
+    ],
+    "flow": [
+      "1. Get all available countries",
+      "2. User selects a country",
+      "3. Get all cities in selected country using this endpoint",
+      "4. Display cities to user",
+      "5. User can subscribe to specific cities"
+    ]
+  },
+  "notes": [
+    "Multilingual support: All names returned in 5 languages (en, ar, de, fr, it)",
+    "Performance: Returns all cities for a country - consider caching on frontend",
+    "Empty results: If country has no cities, cities array will be empty []",
+    "Order: Cities returned by creation order (ID) - may want to sort alphabetically on frontend"
+  ],
+  "errorCodes": {
+    "200": "Success",
+    "404": "Country not found",
+    "422": "Validation error (invalid country_id)",
+    "401": "Unauthorized (missing or invalid token)"
+  }
+}

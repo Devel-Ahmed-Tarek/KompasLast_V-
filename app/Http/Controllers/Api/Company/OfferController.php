@@ -144,7 +144,7 @@ class OfferController extends Controller
         // Start transaction
         DB::beginTransaction();
         try {
-            $offer = Offer::find($request->offer_id);
+            $offer = Offer::with(['country', 'city'])->find($request->offer_id);
 
             if (! $offer || $offer->status == 0) {
                 return HelperFunc::sendResponse(403, "Offer is not available", []);
@@ -157,6 +157,21 @@ class OfferController extends Controller
             $user = User::where('role', 'company')->find($request->user_id);
             if (! $user) {
                 return HelperFunc::sendResponse(404, "User not found", []);
+            }
+
+            // Check if offer has country and city
+            if (!$offer->country_id || !$offer->city_id) {
+                return HelperFunc::sendResponse(403, "Offer location is not specified", []);
+            }
+
+            // Check if company is subscribed to the offer's country
+            if (!$user->countries()->where('country_id', $offer->country_id)->exists()) {
+                return HelperFunc::sendResponse(403, "You must subscribe to the offer's country first", []);
+            }
+
+            // Check if company is subscribed to the offer's city
+            if (!$user->cities()->where('city_id', $offer->city_id)->exists()) {
+                return HelperFunc::sendResponse(403, "You must subscribe to the offer's city first", []);
             }
 
             $amountTotal  = $user->wallet->amount;

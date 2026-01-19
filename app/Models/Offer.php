@@ -10,6 +10,8 @@ class Offer extends Model
     protected $fillable = [
 
         'type_id',
+        'country_id',
+        'city_id',
         'anrede',
         'name',
         'email',
@@ -64,6 +66,16 @@ class Offer extends Model
     public function answers()
     {
         return $this->hasMany(OfferAnswer::class);
+    }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
+    }
+
+    public function city()
+    {
+        return $this->belongsTo(City::class);
     }
 
     // Accessor لحساب حالة الإكمال
