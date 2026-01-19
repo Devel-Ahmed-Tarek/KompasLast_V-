@@ -69,12 +69,12 @@ class Offer extends Model
         return $this->hasMany(OfferAnswer::class);
     }
 
-    public function country()
+    public function countryRelation()
     {
         return $this->belongsTo(Country::class);
     }
 
-    public function city()
+    public function cityRelation()
     {
         return $this->belongsTo(City::class);
     }
