@@ -97,6 +97,8 @@ class HomePageController extends Controller
 
         $Validator = Validator::make($request->all(), [
             'type_id'        => 'required|exists:types,id',
+            'country_id'     => 'required|exists:countries,id',
+            'city_id'        => 'required|exists:cities,id',
             'name'           => 'required|string|max:255',
             'email'          => 'required|email|max:255',
             'phone'          => 'required|string|max:20',
@@ -122,6 +124,16 @@ class HomePageController extends Controller
             'Nach_zipcode'   => 'nullable|string|max:255',
         ]);
 
+        // Validate that city belongs to country
+        if ($request->has('country_id') && $request->has('city_id')) {
+            $city = \App\Models\City::find($request->city_id);
+            if ($city && $city->country_id != $request->country_id) {
+                return HelperFunc::sendResponse(422, 'Validation Error', [
+                    'city_id' => ['The selected city does not belong to the selected country.']
+                ]);
+            }
+        }
+
         if ($Validator->fails()) {
             return HelperFunc::sendResponse(422, 'هناك رسائل تحقق', $Validator->messages()->all());
         }
@@ -129,6 +141,8 @@ class HomePageController extends Controller
         try {
             $data = [
                 'type_id'          => $request->type_id,
+                'country_id'       => $request->country_id,
+                'city_id'          => $request->city_id,
                 'name'             => $request->name,
                 'email'            => $request->email,
                 'phone'            => $request->phone,
