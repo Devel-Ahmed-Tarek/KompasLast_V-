@@ -64,6 +64,8 @@ class AdminOfferController extends Controller
     {
         $offer = Offer::with([
             'type',
+            'country',
+            'city',
             'answers.question',
             'answers.options',
             'answers.files'
