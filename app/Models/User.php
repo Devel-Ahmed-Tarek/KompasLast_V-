@@ -77,6 +77,16 @@ class User extends Authenticatable
         return $this->belongsToMany(Type::class, 'type_user');
     }
 
+    public function countries()
+    {
+        return $this->belongsToMany(Country::class, 'company_countries');
+    }
+
+    public function cities()
+    {
+        return $this->belongsToMany(City::class, 'company_cities');
+    }
+
     public function shopping_list()
     {
         return $this->hasMany(Shopping_list::class, 'user_id');

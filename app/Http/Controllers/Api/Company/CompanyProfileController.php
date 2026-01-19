@@ -9,6 +9,8 @@ use App\Models\Offer;
 use App\Models\Shopping_list;
 use App\Models\Type;
 use App\Models\User;
+use App\Models\Country;
+use App\Models\City;
 use App\Notifications\PaymentNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use function PHPSTORM_META\type;
@@ -398,6 +400,220 @@ class CompanyProfileController extends Controller
         $pdf = Pdf::loadView('pdf.contract_template', $data);
 
         return $pdf->download('contract.pdf');
+    }
+
+    // ==================== Countries Methods ====================
+
+    public function getAvailableCountries()
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        $takenCountryIds = $user->countries->pluck('id')->toArray();
+        $notTakenCountries = Country::whereNotIn('id', $takenCountryIds)->get();
+
+        return HelperFunc::sendResponse(200, 'Available countries fetched successfully', $notTakenCountries);
+    }
+
+    public function addCountry(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'country_id' => 'required|exists:countries,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        // Check if already exists
+        if ($user->countries()->where('country_id', $request->country_id)->exists()) {
+            return HelperFunc::sendResponse(400, 'Country already added', []);
+        }
+
+        $user->countries()->attach($request->country_id);
+
+        $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
+        $country = Country::find($request->country_id);
+        if ($country) {
+            HelperFunc::sendMultilangNotification($admins, "country_added", $user->id, [
+                'en' => 'New country added: ' . ($country->name['en'] ?? ''),
+                'de' => 'Neues Land hinzugefügt: ' . ($country->name['de'] ?? ''),
+            ]);
+        }
+
+        return HelperFunc::sendResponse(200, 'Country added successfully', []);
+    }
+
+    public function deleteCountry(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'country_id' => 'required|exists:countries,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        if (!$user->countries()->where('country_id', $request->country_id)->exists()) {
+            return HelperFunc::sendResponse(404, 'Country not found in your list', []);
+        }
+
+        // Delete country and all its cities
+        $user->countries()->detach($request->country_id);
+        // Also detach all cities from this country
+        $country = Country::find($request->country_id);
+        if ($country) {
+            $cityIds = $country->cities->pluck('id')->toArray();
+            $user->cities()->detach($cityIds);
+        }
+
+        return HelperFunc::sendResponse(200, 'Country deleted successfully', []);
+    }
+
+    public function getSubscribedCountries()
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        $subscribedCountries = $user->countries()->with('cities')->get();
+
+        return HelperFunc::sendResponse(200, 'Subscribed countries fetched successfully', $subscribedCountries);
+    }
+
+    // ==================== Cities Methods ====================
+
+    public function getAvailableCities(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'country_id' => 'nullable|exists:countries,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        $takenCityIds = $user->cities->pluck('id')->toArray();
+        $query = City::whereNotIn('id', $takenCityIds);
+
+        // Filter by country if provided
+        if ($request->has('country_id')) {
+            $query->where('country_id', $request->country_id);
+        }
+
+        $notTakenCities = $query->with('country')->get();
+
+        return HelperFunc::sendResponse(200, 'Available cities fetched successfully', $notTakenCities);
+    }
+
+    public function addCity(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'city_id' => 'required|exists:cities,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        $city = City::find($request->city_id);
+        if (!$city) {
+            return HelperFunc::sendResponse(404, 'City not found', []);
+        }
+
+        // Check if country is subscribed first
+        if (!$user->countries()->where('country_id', $city->country_id)->exists()) {
+            return HelperFunc::sendResponse(400, 'You must subscribe to the country first', []);
+        }
+
+        // Check if already exists
+        if ($user->cities()->where('city_id', $request->city_id)->exists()) {
+            return HelperFunc::sendResponse(400, 'City already added', []);
+        }
+
+        $user->cities()->attach($request->city_id);
+
+        $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
+        HelperFunc::sendMultilangNotification($admins, "city_added", $user->id, [
+            'en' => 'New city added: ' . ($city->name['en'] ?? ''),
+            'de' => 'Neue Stadt hinzugefügt: ' . ($city->name['de'] ?? ''),
+        ]);
+
+        return HelperFunc::sendResponse(200, 'City added successfully', []);
+    }
+
+    public function deleteCity(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'city_id' => 'required|exists:cities,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        if (!$user->cities()->where('city_id', $request->city_id)->exists()) {
+            return HelperFunc::sendResponse(404, 'City not found in your list', []);
+        }
+
+        $user->cities()->detach($request->city_id);
+
+        return HelperFunc::sendResponse(200, 'City deleted successfully', []);
+    }
+
+    public function getSubscribedCities(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'country_id' => 'nullable|exists:countries,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        $query = $user->cities()->with('country');
+
+        // Filter by country if provided
+        if ($request->has('country_id')) {
+            $query->where('country_id', $request->country_id);
+        }
+
+        $subscribedCities = $query->get();
+
+        return HelperFunc::sendResponse(200, 'Subscribed cities fetched successfully', $subscribedCities);
     }
 
 }

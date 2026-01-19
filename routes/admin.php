@@ -280,6 +280,18 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::get('company/types/dont/haveing', [AdminCompanyController::class, 'gityourType']);
     Route::get('company/types/haveing', [AdminCompanyController::class, 'TypesHaveing']);
 
+    // Company Countries management
+    Route::get('company/countries/available', [AdminCompanyController::class, 'getAvailableCountries']);
+    Route::post('company/countries/add', [AdminCompanyController::class, 'addCountry']);
+    Route::post('company/countries/remove', [AdminCompanyController::class, 'deleteCountry']);
+    Route::get('company/countries/all', [AdminCompanyController::class, 'getSubscribedCountries']);
+
+    // Company Cities management
+    Route::get('company/cities/available', [AdminCompanyController::class, 'getAvailableCities']);
+    Route::post('company/cities/add', [AdminCompanyController::class, 'addCity']);
+    Route::post('company/cities/remove', [AdminCompanyController::class, 'deleteCity']);
+    Route::get('company/cities/all', [AdminCompanyController::class, 'getSubscribedCities']);
+
     // Countries management
     Route::get('countries', [AdminCountryController::class, 'index']);
     Route::post('countries', [AdminCountryController::class, 'store']);

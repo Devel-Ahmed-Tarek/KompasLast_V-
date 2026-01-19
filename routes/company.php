@@ -30,6 +30,18 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     Route::post('add/types', [CompanyProfileController::class, 'addType']);
     Route::post('remove/types', [CompanyProfileController::class, 'deleteType']);
     Route::get('all/types', [CompanyProfileController::class, 'getSubscribedTypes']);
+
+    // Countries management
+    Route::get('countries/available', [CompanyProfileController::class, 'getAvailableCountries']);
+    Route::post('countries/add', [CompanyProfileController::class, 'addCountry']);
+    Route::post('countries/remove', [CompanyProfileController::class, 'deleteCountry']);
+    Route::get('countries/all', [CompanyProfileController::class, 'getSubscribedCountries']);
+
+    // Cities management
+    Route::get('cities/available', [CompanyProfileController::class, 'getAvailableCities']);
+    Route::post('cities/add', [CompanyProfileController::class, 'addCity']);
+    Route::post('cities/remove', [CompanyProfileController::class, 'deleteCity']);
+    Route::get('cities/all', [CompanyProfileController::class, 'getSubscribedCities']);
     Route::get('profile/auth', [CompanyProfileController::class, 'profile_auth']);
 
     Route::get('dashboard', [CompanyDachbouredController::class, 'index']);
