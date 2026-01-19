@@ -119,4 +119,30 @@ class AdminCityController extends Controller
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }
     }
+
+    // Get all cities by country
+    public function getCitiesByCountry($country_id)
+    {
+        $validator = Validator::make(['country_id' => $country_id], [
+            'country_id' => 'required|exists:countries,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $country = Country::with('cities')->find($country_id);
+        
+        if (!$country) {
+            return HelperFunc::sendResponse(404, 'Country not found', []);
+        }
+
+        return HelperFunc::sendResponse(200, 'Cities fetched successfully', [
+            'country' => [
+                'id' => $country->id,
+                'name' => $country->name,
+            ],
+            'cities' => $country->cities
+        ]);
+    }
 }

@@ -42,6 +42,7 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     Route::post('cities/add', [CompanyProfileController::class, 'addCity']);
     Route::post('cities/remove', [CompanyProfileController::class, 'deleteCity']);
     Route::get('cities/all', [CompanyProfileController::class, 'getSubscribedCities']);
+    Route::get('cities/by-country/{country_id}', [CompanyProfileController::class, 'getCitiesByCountry']);
     Route::get('profile/auth', [CompanyProfileController::class, 'profile_auth']);
 
     Route::get('dashboard', [CompanyDachbouredController::class, 'index']);
