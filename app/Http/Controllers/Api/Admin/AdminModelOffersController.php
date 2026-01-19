@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
@@ -164,5 +165,4 @@ class AdminModelOffersController extends Controller
 
         return HelperFunc::sendResponse(200, 'Offer status updated successfully', $page);
     }
-
 }
