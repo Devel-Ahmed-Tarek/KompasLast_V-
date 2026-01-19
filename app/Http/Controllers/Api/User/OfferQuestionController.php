@@ -582,6 +582,8 @@ class OfferQuestionController extends Controller
         // Validation rules
         $validator = Validator::make($request->all(), [
             'type_id' => 'required|exists:types,id',
+            'country_id' => 'required|exists:countries,id',
+            'city_id' => 'required|exists:cities,id',
             'answers' => 'required|array',
             'answers.*.question_id' => 'required|exists:type_questions,id',
             'answers.*.answer' => 'nullable|string',
@@ -612,6 +614,16 @@ class OfferQuestionController extends Controller
             'Nach_country' => 'nullable|string|max:255',
             'Nach_zipcode' => 'nullable|string|max:255',
         ]);
+
+        // Validate that city belongs to country
+        if ($request->has('country_id') && $request->has('city_id')) {
+            $city = \App\Models\City::find($request->city_id);
+            if ($city && $city->country_id != $request->country_id) {
+                return HelperFunc::sendResponse(422, 'Validation Error', [
+                    'city_id' => ['The selected city does not belong to the selected country.']
+                ]);
+            }
+        }
 
         if ($validator->fails()) {
             return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors());
@@ -665,6 +677,8 @@ class OfferQuestionController extends Controller
             // إنشاء أو تحديث الـ Offer
             $offerData = [
                 'type_id' => $typeId,
+                'country_id' => $request->country_id,
+                'city_id' => $request->city_id,
                 'name' => $request->name ?? 'Guest User',
                 'email' => $request->email ?? 'guest@example.com',
                 'phone' => $request->phone ?? '',
@@ -1197,10 +1211,15 @@ class OfferQuestionController extends Controller
     private function bayOffer($offer_id)
     {
         try {
-            $offer = Offer::with('type')->find($offer_id);
+            $offer = Offer::with(['type', 'country', 'city'])->find($offer_id);
 
             if (!$offer || !$offer->type) {
                 return;
+            }
+
+            // Check if offer has country and city
+            if (!$offer->country_id || !$offer->city_id) {
+                return; // Skip if offer doesn't have location
             }
 
             $today = now()->format('Y-m-d');
@@ -1213,6 +1232,12 @@ class OfferQuestionController extends Controller
                 })
                 ->whereHas('typesComapny', function ($query) use ($offer) {
                     $query->where('type_id', $offer->type_id);
+                })
+                ->whereHas('countries', function ($query) use ($offer) {
+                    $query->where('country_id', $offer->country_id);
+                })
+                ->whereHas('cities', function ($query) use ($offer) {
+                    $query->where('city_id', $offer->city_id);
                 })
                 ->withCount([
                     'shopping_list as shopping_list_count' => function ($query) use ($today) {
