@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Website\ServesPageController;
 use App\Http\Controllers\Api\Website\SitemapController;
 use App\Http\Controllers\Api\Website\TermsPageController;
 use App\Http\Controllers\Api\Website\VisitorController;
+use App\Http\Controllers\Api\Website\CountryCityController;
 use App\Http\Controllers\Api\User\OfferQuestionController;
 use App\Http\Controllers\PageServesFormController;
 use Illuminate\Support\Facades\File;
@@ -42,6 +43,10 @@ Route::prefix('user')->group(function () {
     Route::get('imprint', [ImprintPageController::class, 'index']);
     Route::get('privacy', [PrivacyPageController::class, 'index']);
     Route::get('terms', [TermsPageController::class, 'index']);
+
+    // Countries and Cities for website forms
+    Route::get('countries', [CountryCityController::class, 'getCountries']);
+    Route::get('cities/by-country/{country_id}', [CountryCityController::class, 'getCitiesByCountry']);
 
     Route::get('company/{id}', [CompaneisPageController::class, 'getCompany']);
     Route::get('model/offers', [ModelOffersController::class, 'index']);
