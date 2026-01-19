@@ -27,22 +27,44 @@ class OfferWithAnswersResource extends JsonResource
                 'price' => $this->type->price,
             ],
             'country' => $this->when($this->country, function () use ($lang) {
-                $countryName = $this->country->getTranslation('name', $lang, false);
-                if (!$countryName) {
-                    $nameArray = is_array($this->country->name) ? $this->country->name : json_decode($this->country->name, true);
-                    $countryName = $nameArray[$lang] ?? $nameArray['en'] ?? '';
+                // Get name - handle both array and JSON string formats
+                $nameValue = $this->country->name;
+
+                if (is_array($nameValue)) {
+                    $countryName = $nameValue[$lang] ?? $nameValue['en'] ?? '';
+                } elseif (is_string($nameValue)) {
+                    $nameArray = json_decode($nameValue, true);
+                    if (is_array($nameArray)) {
+                        $countryName = $nameArray[$lang] ?? $nameArray['en'] ?? '';
+                    } else {
+                        $countryName = '';
+                    }
+                } else {
+                    $countryName = '';
                 }
+
                 return [
                     'id' => $this->country->id,
                     'name' => $countryName,
                 ];
             }),
             'city' => $this->when($this->city, function () use ($lang) {
-                $cityName = $this->city->getTranslation('name', $lang, false);
-                if (!$cityName) {
-                    $nameArray = is_array($this->city->name) ? $this->city->name : json_decode($this->city->name, true);
-                    $cityName = $nameArray[$lang] ?? $nameArray['en'] ?? '';
+                // Get name - handle both array and JSON string formats
+                $nameValue = $this->city->name;
+
+                if (is_array($nameValue)) {
+                    $cityName = $nameValue[$lang] ?? $nameValue['en'] ?? '';
+                } elseif (is_string($nameValue)) {
+                    $nameArray = json_decode($nameValue, true);
+                    if (is_array($nameArray)) {
+                        $cityName = $nameArray[$lang] ?? $nameArray['en'] ?? '';
+                    } else {
+                        $cityName = '';
+                    }
+                } else {
+                    $cityName = '';
                 }
+
                 return [
                     'id' => $this->city->id,
                     'name' => $cityName,
