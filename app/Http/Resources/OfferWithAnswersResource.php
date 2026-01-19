@@ -26,9 +26,9 @@ class OfferWithAnswersResource extends JsonResource
                 'name' => $this->type->getTranslation('name', $lang),
                 'price' => $this->type->price,
             ],
-            'country' => $this->country->name,
+            'country' => $this->country,
 
-            'city' => $this->city->name,
+            'city' => $this->city,
             'completion_status' => $this->completion_status,
             'name' => $this->name,
             'email' => $this->email,
