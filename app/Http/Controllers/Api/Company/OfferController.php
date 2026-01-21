@@ -43,6 +43,10 @@ class OfferController extends Controller
             ],
         ]));
 
+        // Get company's subscribed countries and cities
+        $companyCountryIds = $currentCompany->countries()->pluck('countries.id')->toArray();
+        $companyCityIds = $currentCompany->cities()->pluck('cities.id')->toArray();
+
         // Query offers that are not yet purchased by the logged-in company
         // مقارنة التاريخ - بما أن date من نوع date فقط، نستخدم whereDate
         // هذا سيعيد كل الـ offers التي تاريخها >= اليوم (يشمل نفس اليوم)
@@ -53,6 +57,10 @@ class OfferController extends Controller
                 // Check if the offer type is related to the current company
                 $query->whereIn('id', $currentCompany->typesComapny->pluck('id'));
             })
+            // Filter by company's subscribed countries
+            ->whereIn('country_id', $companyCountryIds)
+            // Filter by company's subscribed cities
+            ->whereIn('city_id', $companyCityIds)
             ->whereDoesntHave('Shopping_list', function ($query) use ($currentCompanyId) {
                 // Ensure the offer is not in the shopping list of the current company
                 $query->where('user_id', $currentCompanyId);
