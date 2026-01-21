@@ -242,7 +242,13 @@ class AdminCompanyController extends Controller
 
         $takenTypeIds = $user->typesComapny->pluck('id')->toArray();
 
-        $notTakenTypes = Type::whereNotIn('id', $takenTypeIds)->get();
+        // Get available types (not taken by company) with hierarchy
+        $notTakenTypes = Type::whereNotIn('id', $takenTypeIds)
+            ->where('is_active', true)
+            ->with('parent')
+            ->orderBy('parent_id')
+            ->orderBy('order')
+            ->get();
 
         return HelperFunc::sendResponse(200, '', $notTakenTypes);
     }
@@ -264,7 +270,12 @@ class AdminCompanyController extends Controller
 
         $takenTypeIds = $user->typesComapny->pluck('id')->toArray();
 
-        $takenTypes = Type::whereIn('id', $takenTypeIds)->get();
+        // Get types that company has with hierarchy
+        $takenTypes = Type::whereIn('id', $takenTypeIds)
+            ->with('parent')
+            ->orderBy('parent_id')
+            ->orderBy('order')
+            ->get();
 
         return HelperFunc::sendResponse(200, '', $takenTypes);
 

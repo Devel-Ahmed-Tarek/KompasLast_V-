@@ -14,9 +14,19 @@ class ServesSelectPageResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'id' => $this->id,
             'name' => $this->name,
+            'price' => $this->price,
+            'parent_id' => $this->parent_id,
+            'is_parent' => is_null($this->parent_id),
         ];
+
+        // Include children if they are loaded and exist
+        if ($this->relationLoaded('children') && $this->children->isNotEmpty()) {
+            $data['children'] = ServesSelectPageResource::collection($this->children);
+        }
+
+        return $data;
     }
 }

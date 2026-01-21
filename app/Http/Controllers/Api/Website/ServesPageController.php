@@ -27,12 +27,25 @@ class ServesPageController extends Controller
 
     public function select(Request $request)
     {
-
         $language = $request->get('lang', 'en'); // Default to 'en' if no language is provided
-
         App::setLocale($language);
 
-        $serves = Type::all(); // Fetch all Type records
+        // Check if flat list is requested
+        $flat = $request->query('flat', false);
+
+        if ($flat) {
+            // Return flat list of all active types
+            $serves = Type::where('is_active', true)->orderBy('parent_id')->orderBy('order')->get();
+        } else {
+            // Return hierarchical structure (parents with children)
+            $serves = Type::whereNull('parent_id')
+                ->where('is_active', true)
+                ->with(['children' => function ($query) {
+                    $query->where('is_active', true)->orderBy('order');
+                }])
+                ->orderBy('order')
+                ->get();
+        }
 
         // Check if no data is found
         if ($serves->isEmpty()) {

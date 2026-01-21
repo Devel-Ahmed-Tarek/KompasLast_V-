@@ -71,12 +71,16 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     //
     Route::get('/offer-execut', [AdminOfferExecutionController::class, 'index']);
     Route::get('/offer-cnnouncement', [AdminOfferExecutionController::class, 'AnnouncementGet']);
-    // Types management
+    // Types management (with hierarchy support)
     Route::get('/types', [AdminTypeController::class, 'index']);
+    Route::get('/types/parents', [AdminTypeController::class, 'getParentTypes']);
     Route::get('/types/{id}', [AdminTypeController::class, 'show']);
+    Route::get('/types/{id}/children', [AdminTypeController::class, 'getChildren']);
     Route::post('/types', [AdminTypeController::class, 'store']);
     Route::put('/types/{id}', [AdminTypeController::class, 'update']);
     Route::delete('/types/{id}', [AdminTypeController::class, 'destroy']);
+    Route::post('/types/reorder', [AdminTypeController::class, 'reorder']);
+    Route::put('/types/{id}/toggle-active', [AdminTypeController::class, 'toggleActive']);
 
     // Orders management
     Route::get('orders/pending', [AdminOrderController::class, 'pending']);
