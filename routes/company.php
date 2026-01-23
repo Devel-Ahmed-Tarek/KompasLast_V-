@@ -66,6 +66,12 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     Route::get('get-my-completed-offer', [OfferController::class, 'getCompletedOffer']);
     Route::get('singel-offer/{id}', [OfferController::class, 'singelOffer']);
 
+    // Favorites
+    Route::get('favorites', [OfferController::class, 'getFavorites']);
+    Route::post('favorites/add', [OfferController::class, 'addToFavorites']);
+    Route::post('favorites/remove', [OfferController::class, 'removeFromFavorites']);
+    Route::get('favorites/check', [OfferController::class, 'checkFavorite']);
+
     Route::get('/{id}/profile', [CompanyProfileController::class, 'show']);
     Route::put('/{status}/profile', [CompanyProfileController::class, 'updateDinamicOfferCompany']);
     Route::post('/{id}/profile', [CompanyProfileController::class, 'update']);

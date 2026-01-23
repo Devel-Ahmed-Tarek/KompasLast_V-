@@ -92,6 +92,11 @@ class User extends Authenticatable
         return $this->hasMany(Shopping_list::class, 'user_id');
     }
 
+    public function favoriteOffers()
+    {
+        return $this->hasMany(OfferFavorite::class, 'user_id');
+    }
+
     public function generateOtp()
     {
         $this->otp            = rand(100000, 999999);  // إنشاء OTP مكون من 6 أرقام

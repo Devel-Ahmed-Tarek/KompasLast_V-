@@ -10,6 +10,7 @@ use App\Models\ConfigApp;
 use App\Models\Coupon;
 use App\Models\Offer;
 use App\Models\OfferExecution;
+use App\Models\OfferFavorite;
 use App\Models\Shopping_list;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -394,4 +395,113 @@ class OfferController extends Controller
         $offers = OfferExecution::with('offer')->where('company_id', $id)->where('is_executed', '1')->paginate(10);
         return HelperFunc::pagination($offers, $offers->items());
     }
+
+    /**
+     * إضافة offer للمفضلة
+     */
+    public function addToFavorites(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'offer_id' => 'required|exists:offers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation Error', $validator->errors());
+        }
+
+        $user = Auth::user();
+        $offerId = $request->offer_id;
+
+        // Check if offer exists and is available
+        $offer = Offer::where('id', $offerId)
+            ->where('status', 1)
+            ->where('count', '>', 0)
+            ->first();
+
+        if (!$offer) {
+            return HelperFunc::sendResponse(404, 'Offer not found or not available', []);
+        }
+
+        // Check if already in favorites
+        $exists = OfferFavorite::where('user_id', $user->id)
+            ->where('offer_id', $offerId)
+            ->exists();
+
+        if ($exists) {
+            return HelperFunc::sendResponse(400, 'Offer already in favorites', []);
+        }
+
+        // Add to favorites
+        OfferFavorite::create([
+            'user_id' => $user->id,
+            'offer_id' => $offerId,
+        ]);
+
+        return HelperFunc::sendResponse(201, 'Offer added to favorites', []);
+    }
+
+    /**
+     * حذف offer من المفضلة
+     */
+    public function removeFromFavorites(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'offer_id' => 'required|exists:offers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation Error', $validator->errors());
+        }
+
+        $user = Auth::user();
+        $offerId = $request->offer_id;
+
+        $deleted = OfferFavorite::where('user_id', $user->id)
+            ->where('offer_id', $offerId)
+            ->delete();
+
+        if ($deleted) {
+            return HelperFunc::sendResponse(200, 'Offer removed from favorites', []);
+        }
+
+        return HelperFunc::sendResponse(404, 'Offer not found in favorites', []);
+    }
+
+    /**
+     * عرض المفضلة (فقط العروض المتاحة)
+     */
+    public function getFavorites(Request $request)
+    {
+        $user = Auth::user();
+
+        // Get favorites with available offers only (count > 0, status = 1, date >= today)
+        $favorites = OfferFavorite::where('user_id', $user->id)
+            ->whereHas('offer', function ($query) {
+                $query->where('status', 1)
+                    ->where('count', '>', 0)
+                    ->whereDate('date', '>=', now()->format('Y-m-d'));
+            })
+            ->with([
+                'offer.type',
+                'offer.answers' => function ($query) {
+                    $query->whereHas('question', function ($q) {
+                        $q->where('show_before_purchase', true);
+                    });
+                },
+                'offer.answers.question',
+                'offer.answers.options',
+                'offer.answers.files'
+            ])
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        // Transform to offers
+        $offers = $favorites->getCollection()->map(function ($favorite) {
+            return $favorite->offer;
+        });
+
+        return HelperFunc::pagination($favorites, OfferShopResource::collection($offers));
+    }
+
+   
 }

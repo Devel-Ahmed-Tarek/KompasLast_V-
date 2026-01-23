@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\OfferFavorite;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,9 @@ class OfferShopResource extends JsonResource
     public function toArray(Request $request): array
     {
         $lang = $request->get('lang', 'en');
+        
+        // Check if this offer is in user's favorites
+        $isFavorite = OfferFavorite::isFavorite($this->id);
 
         // تصفية الإجابات للأسئلة التي show_before_purchase = true فقط
         $answersBeforePurchase = [];
@@ -75,6 +79,7 @@ class OfferShopResource extends JsonResource
             'Number_of_offers' => $this->Number_of_offers,
             'count'            => $this->count,
             'status'           => $this->status,
+            'is_favorite'      => $isFavorite,
             'answers'          => $answersBeforePurchase,
         ];
     }
