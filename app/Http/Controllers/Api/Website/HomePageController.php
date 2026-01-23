@@ -40,11 +40,24 @@ class HomePageController extends Controller
         $data['faq']         = Faq::take(5)->get()?->makeHidden(['created_at', 'updated_at']);
         $data['partnerPage'] = PartnerPage::first()?->makeHidden(['created_at', 'updated_at']);
 
-        // Fetch services and localize data if needed
-        $data['services'] = Type::with(['typeDitaliServices' => function ($query) {
-            $query->select('id', 'type_id', 'short_description', 'small_image', 'slug', 'service_home_icon');
-        }, 'typeDitaliServices.media'])
-            ->select('id', 'name')
+        // Fetch services hierarchically (parents with children)
+        $data['services'] = Type::with([
+            'typeDitaliServices' => function ($query) {
+                $query->select('id', 'type_id', 'short_description', 'small_image', 'slug', 'service_home_icon');
+            },
+            'typeDitaliServices.media',
+            'children' => function ($query) {
+                $query->where('is_active', true)->orderBy('order');
+            },
+            'children.typeDitaliServices' => function ($query) {
+                $query->select('id', 'type_id', 'short_description', 'small_image', 'slug', 'service_home_icon');
+            },
+            'children.typeDitaliServices.media'
+        ])
+            ->whereNull('parent_id') // Only parent types
+            ->where('is_active', true)
+            ->orderBy('order')
+            ->select('id', 'name', 'price', 'parent_id', 'order')
             ->get()
             ->map(function ($item) {
                 return $item->makeHidden(['created_at', 'updated_at']);

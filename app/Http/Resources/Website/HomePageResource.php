@@ -81,49 +81,7 @@ class HomePageResource extends JsonResource
             'services_title'     => $this->home->services_title,
             'services_sub_title' => $this->home->services_sub_title,
             'services'           => $this->services->map(function ($service) {
-                $typeDetails = optional($service->typeDitaliServices);
-                $locale = app()->getLocale();
-
-                // جلب الصور الديناميكية
-                $dynamicMedia = [];
-                if ($typeDetails && $typeDetails->relationLoaded('media')) {
-                    $media = $typeDetails->media()
-                        ->where('language', $locale)
-                        ->orderBy('field_name')
-                        ->orderBy('order')
-                        ->get();
-
-                    foreach ($media as $item) {
-                        $fieldName = $item->field_name;
-                        if (!isset($dynamicMedia[$fieldName])) {
-                            $dynamicMedia[$fieldName] = [];
-                        }
-                        $dynamicMedia[$fieldName][] = [
-                            'id' => $item->id,
-                            'file_path' => asset($item->file_path),
-                            'file_name' => $item->file_name,
-                            'file_type' => $item->file_type,
-                            'order' => $item->order,
-                        ];
-                    }
-
-                    // إذا كان في صورة واحدة فقط، نرجعها مباشرة
-                    foreach ($dynamicMedia as $fieldName => $images) {
-                        if (count($images) === 1) {
-                            $dynamicMedia[$fieldName] = $images[0];
-                        }
-                    }
-                }
-
-                return [
-                    'id'                => $service->id,
-                    'name'              => $service->name,
-                    'short_description' => $typeDetails->short_description ?? 'No description available',
-                    'slug'              => $typeDetails->slug ?? 'No description available',
-                    'small_image'       => HelperFunc::getLocalizedImage($typeDetails->small_image) ? asset(HelperFunc::getLocalizedImage($typeDetails->small_image)) : null,
-                    'service_home_icon' => $typeDetails->service_home_icon ? asset($typeDetails->service_home_icon) : null,
-                    'media'             => $dynamicMedia, // الصور الديناميكية
-                ];
+                return $this->formatService($service);
             }),
 
             'reviewCompany'      => $this->reviewCompany,
@@ -232,5 +190,79 @@ class HomePageResource extends JsonResource
         }
 
         return $formatted;
+    }
+
+    /**
+     * تنسيق الخدمة (تستخدم للـ Parent والـ Children)
+     */
+    private function formatService($service)
+    {
+        $typeDetails = optional($service->typeDitaliServices);
+        $locale = app()->getLocale();
+
+        // جلب الصور الديناميكية
+        $dynamicMedia = $this->getServiceMedia($typeDetails, $locale);
+
+        $formatted = [
+            'id'                => $service->id,
+            'name'              => $service->name,
+            'price'             => $service->price ?? null,
+            'short_description' => $typeDetails->short_description ?? 'No description available',
+            'slug'              => $typeDetails->slug ?? 'No description available',
+            'small_image'       => HelperFunc::getLocalizedImage($typeDetails->small_image) ? asset(HelperFunc::getLocalizedImage($typeDetails->small_image)) : null,
+            'service_home_icon' => $typeDetails->service_home_icon ? asset($typeDetails->service_home_icon) : null,
+            'media'             => $dynamicMedia,
+            'is_parent'         => is_null($service->parent_id),
+        ];
+
+        // إضافة الأنواع الفرعية (Children) إذا كانت موجودة
+        if ($service->relationLoaded('children') && $service->children->isNotEmpty()) {
+            $formatted['children'] = $service->children->map(function ($child) {
+                return $this->formatService($child);
+            });
+        } else {
+            $formatted['children'] = [];
+        }
+
+        return $formatted;
+    }
+
+    /**
+     * جلب الصور الديناميكية للخدمة
+     */
+    private function getServiceMedia($typeDetails, $locale)
+    {
+        $dynamicMedia = [];
+        
+        if ($typeDetails && method_exists($typeDetails, 'relationLoaded') && $typeDetails->relationLoaded('media')) {
+            $media = $typeDetails->media()
+                ->where('language', $locale)
+                ->orderBy('field_name')
+                ->orderBy('order')
+                ->get();
+
+            foreach ($media as $item) {
+                $fieldName = $item->field_name;
+                if (!isset($dynamicMedia[$fieldName])) {
+                    $dynamicMedia[$fieldName] = [];
+                }
+                $dynamicMedia[$fieldName][] = [
+                    'id' => $item->id,
+                    'file_path' => asset($item->file_path),
+                    'file_name' => $item->file_name,
+                    'file_type' => $item->file_type,
+                    'order' => $item->order,
+                ];
+            }
+
+            // إذا كان في صورة واحدة فقط، نرجعها مباشرة
+            foreach ($dynamicMedia as $fieldName => $images) {
+                if (count($images) === 1) {
+                    $dynamicMedia[$fieldName] = $images[0];
+                }
+            }
+        }
+
+        return $dynamicMedia;
     }
 }
