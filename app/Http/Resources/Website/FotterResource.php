@@ -44,13 +44,31 @@ class FotterResource extends JsonResource
                 'phone'   => $config?->phone,
                 'logo'    => $config?->logo ? asset($config->logo) : null,
             ],
-            'servicesItem' => Type::with('typeDitaliServices')->get()->map(function ($item) {
-                return [
-                    'id'   => $item->id,
-                    'name' => $item->name,
-                    'slug' => $item->typeDitaliServices?->slug,
-                ];
-            }),
+            'servicesItem' => Type::whereNull('parent_id')
+                ->where('is_active', true)
+                ->with([
+                    'typeDitaliServices:id,type_id,slug',
+                    'children' => function ($query) {
+                        $query->where('is_active', true)->orderBy('order');
+                    },
+                    'children.typeDitaliServices:id,type_id,slug'
+                ])
+                ->orderBy('order')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id'       => $item->id,
+                        'name'     => $item->name,
+                        'slug'     => $item->typeDitaliServices?->slug,
+                        'children' => $item->children->map(function ($child) {
+                            return [
+                                'id'   => $child->id,
+                                'name' => $child->name,
+                                'slug' => $child->typeDitaliServices?->slug,
+                            ];
+                        }),
+                    ];
+                }),
         ];
     }
 }
