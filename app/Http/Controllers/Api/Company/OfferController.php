@@ -152,7 +152,7 @@ class OfferController extends Controller
         // Start transaction
         DB::beginTransaction();
         try {
-            $offer = Offer::with(['country', 'city'])->find($request->offer_id);
+            $offer = Offer::find($request->offer_id);
 
             if (! $offer || $offer->status == 0) {
                 return HelperFunc::sendResponse(403, "Offer is not available", []);
