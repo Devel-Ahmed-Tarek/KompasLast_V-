@@ -35,14 +35,22 @@ class ServesPageController extends Controller
 
         if ($flat) {
             // Return flat list of all active types
-            $serves = Type::where('is_active', true)->orderBy('parent_id')->orderBy('order')->get();
+            $serves = Type::where('is_active', true)
+                ->with('typeDitaliServices:id,type_id,slug')
+                ->orderBy('parent_id')
+                ->orderBy('order')
+                ->get();
         } else {
             // Return hierarchical structure (parents with children)
             $serves = Type::whereNull('parent_id')
                 ->where('is_active', true)
-                ->with(['children' => function ($query) {
-                    $query->where('is_active', true)->orderBy('order');
-                }])
+                ->with([
+                    'typeDitaliServices:id,type_id,slug',
+                    'children' => function ($query) {
+                        $query->where('is_active', true)->orderBy('order');
+                    },
+                    'children.typeDitaliServices:id,type_id,slug'
+                ])
                 ->orderBy('order')
                 ->get();
         }

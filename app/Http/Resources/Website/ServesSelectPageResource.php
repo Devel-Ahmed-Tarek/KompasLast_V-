@@ -18,6 +18,7 @@ class ServesSelectPageResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'price' => $this->price,
+            'slug' => $this->typeDitaliServices?->slug,
             'parent_id' => $this->parent_id,
             'is_parent' => is_null($this->parent_id),
         ];
