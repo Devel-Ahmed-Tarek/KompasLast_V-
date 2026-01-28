@@ -22,7 +22,9 @@ class OfferAnswerResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $lang = $request->get('lang', $this->lang ?? 'en');
+        // Get language from Accept-Language header or query param, default to 'en'
+        $lang = $request->header('Accept-Language', $request->get('lang', $this->lang ?? 'en'));
+        $lang = substr($lang, 0, 2); // Take only first 2 characters (e.g., "en-US" → "en")
         
         return [
             'id' => $this->id,
