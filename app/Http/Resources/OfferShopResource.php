@@ -15,7 +15,9 @@ class OfferShopResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $lang = $request->get('lang', 'en');
+        // Get language from Accept-Language header or query param, default to 'en'
+        $lang = $request->header('Accept-Language', $request->get('lang', 'en'));
+        $lang = substr($lang, 0, 2); // Take only first 2 characters (e.g., "en-US" → "en")
         
         // Check if this offer is in user's favorites
         $isFavorite = OfferFavorite::isFavorite($this->id);
