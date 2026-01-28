@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\Auth;
 
 class CompanyDachbouredController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $company = Auth::user();
+        $lang = $request->get('lang', 'en'); // Get language from request
 
         // Fetch wallet details for the authenticated company
         $wallet = $company->wallet()->get();
@@ -24,22 +25,30 @@ class CompanyDachbouredController extends Controller
         // Group shopping lists by type ID and calculate counts
         $offerCountsByType = $shoppingLists->groupBy(function ($shoppingList) {
             return optional($shoppingList->offer->type)->id; // Group by type ID
-        })->map(function ($group) {
+        })->map(function ($group) use ($lang) {
+            $type = optional($group->first()->offer->type);
             return [
-                'type_name'   => optional($group->first()->offer->type)->name, // Type name
-                'offer_count' => $group->count(),                              // Count of offers
+                'type_id'     => $type->id ?? null,
+                'type_name'   => $type ? $type->getTranslation('name', $lang) : null, // Type name based on lang
+                'offer_count' => $group->count(), // Count of offers
             ];
         })->values(); // Reindex keys for cleaner JSON output
 
         // Get the last 10 offers with selected fields
-        $lastOffer = $shoppingLists->take(10)->map(function ($shoppingList) {
+        $lastOffer = $shoppingLists->take(10)->map(function ($shoppingList) use ($lang) {
             $offer = $shoppingList->offer;
-            return $offer ? [
+            if (!$offer) return null;
+            
+            return [
                 'id'         => $offer->id,
                 'created_at' => $offer->created_at,
                 'date'       => $offer->date,
-                'type'       => $offer->type,
-            ] : null;
+                'type'       => [
+                    'id'    => $offer->type?->id,
+                    'name'  => $offer->type?->getTranslation('name', $lang),
+                    'price' => $offer->type?->price,
+                ],
+            ];
         })->filter(); // Remove null values if any shopping list lacks an offer
 
         // Return the response using a helper function
