@@ -41,6 +41,9 @@ class Offer extends Model
         'Nach_country',
         'Nach_zipcode',
         'completion_status',
+        'confirm_status',
+        'confirm_token',
+        'confirmed_at',
     ];
 
     protected $casts = [
