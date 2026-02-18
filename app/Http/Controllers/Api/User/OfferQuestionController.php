@@ -1069,7 +1069,7 @@ class OfferQuestionController extends Controller
             if ($request->email) {
                 try {
                     $confirmUrl = "https://auftragkompass.de/" . $lang . "/confirm-offer/?token=" . $offer->confirm_token;
-                    Mail::to($request->email)->send(new OfferCreated($lang));
+                    Mail::to($request->email)->send(new OfferCreated($lang, $confirmUrl));
                 } catch (\Exception $e) {
                     // تجاهل خطأ البريد الإلكتروني
                 }
