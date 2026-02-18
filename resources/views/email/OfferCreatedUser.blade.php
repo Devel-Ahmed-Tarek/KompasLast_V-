@@ -23,10 +23,7 @@
                 {{ __('offer.confirm_button') }}
             </a>
         </p>
-        <p style="font-size: 12px; color: #555;">
-            {{ __('offer.confirm_link_help') }}<br>
-            <a href="{{ $confirmUrl }}">{{ $confirmUrl }}</a>
-        </p>
+ 
     @endif
 
     <p>{{ __('offer.followup') }}</p>
