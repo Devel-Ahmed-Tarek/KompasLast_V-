@@ -281,12 +281,9 @@ class HomePageController extends Controller
     {
         $offer = Offer::where('confirm_token', $token)->first();
 
-        if (! $offer) {
-            return HelperFunc::sendResponse(404, 'Offer not found or already confirmed', []);
-        }
-
-        if ($offer->confirm_status === 'confirmed') {
-            return HelperFunc::sendResponse(200, 'Offer already confirmed', []);
+        if (! $offer || $offer->confirm_status === 'confirmed') {
+            // لو الأوفر مش موجود أو متأكد قبل كده نرجعه برضه لصفحة الـ frontend
+            return redirect()->away('https://auftragkompass.de/en/confirm-offer');
         }
 
         DB::beginTransaction();
@@ -299,7 +296,8 @@ class HomePageController extends Controller
             $this->bayOffer($offer->id);
 
             DB::commit();
-            return HelperFunc::sendResponse(200, 'Offer confirmed successfully', []);
+            // بعد نجاح التأكيد والبيع الديناميك نرجع المستخدم لصفحة التأكيد في الـ Frontend
+            return redirect()->away('https://auftragkompass.de/en/confirm-offer');
         } catch (\Exception $e) {
             DB::rollBack();
             return HelperFunc::sendResponse(500, 'An error occurred while confirming the offer: ' . $e->getMessage(), []);
