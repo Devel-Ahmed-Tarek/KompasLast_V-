@@ -6,6 +6,16 @@
 </head>
 
 <body>
+    @php($config = \App\Models\ConfigApp::first())
+
+    @if($config && $config->logo)
+        <div style="text-align: center; margin-bottom: 24px;">
+            <img src="{{ asset($config->logo) }}"
+                 alt="AuftragKompass"
+                 style="max-width: 200px; height: auto;">
+        </div>
+    @endif
+
     <h1>{{ __('offer.title') }}</h1>
     <p>{{ __('offer.greeting') }}</p>
     <p>{{ __('offer.body') }}</p>
