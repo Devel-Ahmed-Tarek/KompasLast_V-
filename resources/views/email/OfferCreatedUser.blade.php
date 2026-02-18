@@ -10,7 +10,6 @@
     <p>{{ __('offer.greeting') }}</p>
     <p>{{ __('offer.body') }}</p>
 
-    @if(!empty($confirmUrl))
         <p>
             <a href="{{ $confirmUrl }}" style="
                 display:inline-block;
@@ -23,7 +22,6 @@
                 {{ __('offer.confirm_button') }}
             </a>
         </p>
-    @endif
 
     <p>{{ __('offer.followup') }}</p>
     <p>{{ __('offer.thanks') }}</p>
