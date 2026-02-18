@@ -718,7 +718,10 @@ class OfferQuestionController extends Controller
                 return HelperFunc::sendResponse(403, 'Offer creation is currently disabled', []);
             }
 
-            $offerData['status'] = $status;
+            $offerData['status']         = $status;
+            $offerData['confirm_status'] = 'pending';
+            $offerData['confirm_token']  = \Illuminate\Support\Str::random(64);
+            $offerData['confirmed_at']   = null;
 
             Log::info('=== Creating Offer ===', [
                 'offer_data' => $offerData,
@@ -1062,11 +1065,11 @@ class OfferQuestionController extends Controller
                 ];
             }
 
-            // إرسال البريد الإلكتروني
+            // إرسال البريد الإلكتروني مع رابط التأكيد
             if ($request->email) {
                 try {
-                    // في هذا الفلو، العرض يكون جاهز بالفعل، فنرسل إيميل بدون رابط تأكيد
-                    Mail::to($request->email)->send(new OfferCreated($lang));
+                    $confirmUrl = url('/api/user/offers/confirm/' . $offer->confirm_token);
+                    Mail::to($request->email)->send(new OfferCreated($lang, $confirmUrl));
                 } catch (\Exception $e) {
                     // تجاهل خطأ البريد الإلكتروني
                 }
