@@ -81,6 +81,10 @@ class OfferShopResource extends JsonResource
             'Number_of_offers' => $this->Number_of_offers,
             'count'            => $this->count,
             'status'           => $this->status,
+            // وصف العرض (من حقل Besonderheiten)
+            'description'      => $this->Besonderheiten,
+            // الرمز البريدي للعرض
+            'zipcode'          => $this->zipcode,
             'is_favorite'      => $isFavorite,
             'answers'          => $answersBeforePurchase,
         ];
