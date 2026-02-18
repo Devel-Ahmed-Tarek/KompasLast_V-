@@ -283,7 +283,7 @@ class HomePageController extends Controller
 
         if (! $offer || $offer->confirm_status === 'confirmed') {
             // لو الأوفر مش موجود أو متأكد قبل كده نرجعه برضه لصفحة الـ frontend
-            return redirect('https://auftragkompass.de/en/confirm-offer');
+            return HelperFunc::sendResponse('200', 'success', []);
         }
 
         DB::beginTransaction();
@@ -297,7 +297,7 @@ class HomePageController extends Controller
 
             DB::commit();
             // بعد نجاح التأكيد والبيع الديناميك نرجع المستخدم لصفحة التأكيد في الـ Frontend
-            return redirect('https://auftragkompass.de/en/confirm-offer');
+            return HelperFunc::sendResponse('200', 'success', []);
         } catch (\Exception $e) {
             DB::rollBack();
             return HelperFunc::sendResponse(500, 'An error occurred while confirming the offer: ' . $e->getMessage(), []);
