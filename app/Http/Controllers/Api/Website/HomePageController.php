@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Location;
 
 class HomePageController extends Controller
@@ -152,6 +153,8 @@ class HomePageController extends Controller
         }
 
         try {
+            $confirmToken = Str::random(64);
+
             $data = [
                 'type_id'          => $request->type_id,
                 'country_id'       => $request->country_id,
@@ -185,26 +188,28 @@ class HomePageController extends Controller
                 'lang'             => $request->lang,
                 'cheek'            => true,
                 'status'           => $status,
+                'confirm_status'   => 'pending',
+                'confirm_token'    => $confirmToken,
+                'confirmed_at'     => null,
                 'created_at'       => now(),
                 'updated_at'       => now(),
             ];
 
             $offerId = DB::table('offers')->insertGetId($data);
+            $offer   = DB::table('offers')->where('id', $offerId)->first();
 
-            $this->bayOffer($offerId);
+            // send email to user with confirmation link
+            $locale     = $request->lang;
+            $confirmUrl = url('/api/user/offers/confirm/' . $confirmToken);
 
-            $offer = DB::table('offers')->where('id', $offerId)->first();
-
-            // send email to user
-            $locale = $request->lang;
-            Mail::to($request->email)->send(new OfferCreated($locale));
+            Mail::to($request->email)->send(new OfferCreated($locale, $confirmUrl));
 
             $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
             HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offer->id, [
                 'en' => 'A new offer "' . $offer->name,
                 'de' => 'Ein neues Angebot "' . $offer->name,
             ]);
-            return HelperFunc::sendResponse(201, 'Offer created successfully', $offer);
+            return HelperFunc::sendResponse(201, 'Offer created successfully. Please confirm your offer from the email.', $offer);
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }
@@ -270,6 +275,35 @@ class HomePageController extends Controller
         $review = ReviewSite::create($validatedData->validated());
 
         return HelperFunc::sendResponse(201, 'Review added successfully', $review);
+    }
+
+    public function confirmOffer($token)
+    {
+        $offer = Offer::where('confirm_token', $token)->first();
+
+        if (! $offer) {
+            return HelperFunc::sendResponse(404, 'Offer not found or already confirmed', []);
+        }
+
+        if ($offer->confirm_status === 'confirmed') {
+            return HelperFunc::sendResponse(200, 'Offer already confirmed', []);
+        }
+
+        DB::beginTransaction();
+        try {
+            $offer->confirm_status = 'confirmed';
+            $offer->confirm_token  = null;
+            $offer->confirmed_at   = now();
+            $offer->save();
+
+            $this->bayOffer($offer->id);
+
+            DB::commit();
+            return HelperFunc::sendResponse(200, 'Offer confirmed successfully', []);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return HelperFunc::sendResponse(500, 'An error occurred while confirming the offer: ' . $e->getMessage(), []);
+        }
     }
 
     private function bayOffer($offer_id)

@@ -1062,12 +1062,10 @@ class OfferQuestionController extends Controller
                 ];
             }
 
-            // تشغيل bayOffer إذا كان موجود
-            $this->bayOffer($offer->id);
-
             // إرسال البريد الإلكتروني
             if ($request->email) {
                 try {
+                    // في هذا الفلو، العرض يكون جاهز بالفعل، فنرسل إيميل بدون رابط تأكيد
                     Mail::to($request->email)->send(new OfferCreated($lang));
                 } catch (\Exception $e) {
                     // تجاهل خطأ البريد الإلكتروني

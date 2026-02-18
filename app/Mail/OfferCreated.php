@@ -10,20 +10,29 @@ class OfferCreated extends Mailable
     use Queueable, SerializesModels;
 
     /**
-     * The offer data.
+     * The locale for the email.
      *
-     * @var array
+     * @var string
      */
     public $locale;
 
     /**
+     * Optional confirmation URL.
+     *
+     * @var string|null
+     */
+    public $confirmUrl;
+
+    /**
      * Create a new message instance.
      *
-     * @param string $locale
+     * @param string      $locale
+     * @param string|null $confirmUrl
      */
-    public function __construct(string $locale)
+    public function __construct(string $locale, ?string $confirmUrl = null)
     {
-        $this->locale = $locale;
+        $this->locale     = $locale;
+        $this->confirmUrl = $confirmUrl;
     }
 
     /**
@@ -35,3 +44,4 @@ class OfferCreated extends Mailable
             ->subject('New Offer Created');
     }
 }
+
