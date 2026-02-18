@@ -200,7 +200,7 @@ class HomePageController extends Controller
 
             // send email to user with confirmation link (web route, no /api prefix)
             $locale     = $request->lang;
-            $confirmUrl = url('/user/offers/confirm/' . $confirmToken);
+            $confirmUrl = "https://auftragkompass.de/" . $locale . "/confirm-offer/?token=" . $confirmToken;
 
             Mail::to($request->email)->send(new OfferCreated($locale, $confirmUrl));
 
