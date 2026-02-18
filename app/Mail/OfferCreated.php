@@ -40,8 +40,12 @@ class OfferCreated extends Mailable
      */
     public function build()
     {
+        // استخدام لغة الإيميل حسب الـ locale القادم من الـ request
+        app()->setLocale($this->locale ?: config('app.locale'));
+
         return $this->view('email.OfferCreatedUser')
-            ->subject('New Offer Created');
+            ->subject(__('offer.title'));
     }
 }
+
 
