@@ -1068,8 +1068,8 @@ class OfferQuestionController extends Controller
             // إرسال البريد الإلكتروني مع رابط التأكيد (web route, no /api prefix)
             if ($request->email) {
                 try {
-                    $confirmUrl = url('/user/offers/confirm/' . $offer->confirm_token);
-                    Mail::to($request->email)->send(new OfferCreated($lang, $confirmUrl));
+                    $confirmUrl = "https://auftragkompass.de/" . $lang . "/confirm-offer/?token=" . $offer->confirm_token;
+                    Mail::to($request->email)->send(new OfferCreated($lang));
                 } catch (\Exception $e) {
                     // تجاهل خطأ البريد الإلكتروني
                 }
