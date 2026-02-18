@@ -1065,10 +1065,10 @@ class OfferQuestionController extends Controller
                 ];
             }
 
-            // إرسال البريد الإلكتروني مع رابط التأكيد
+            // إرسال البريد الإلكتروني مع رابط التأكيد (web route, no /api prefix)
             if ($request->email) {
                 try {
-                    $confirmUrl = url('/api/user/offers/confirm/' . $offer->confirm_token);
+                    $confirmUrl = url('/user/offers/confirm/' . $offer->confirm_token);
                     Mail::to($request->email)->send(new OfferCreated($lang, $confirmUrl));
                 } catch (\Exception $e) {
                     // تجاهل خطأ البريد الإلكتروني

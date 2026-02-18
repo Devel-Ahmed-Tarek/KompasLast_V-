@@ -198,9 +198,9 @@ class HomePageController extends Controller
             $offerId = DB::table('offers')->insertGetId($data);
             $offer   = DB::table('offers')->where('id', $offerId)->first();
 
-            // send email to user with confirmation link
+            // send email to user with confirmation link (web route, no /api prefix)
             $locale     = $request->lang;
-            $confirmUrl = url('/api/user/offers/confirm/' . $confirmToken);
+            $confirmUrl = url('/user/offers/confirm/' . $confirmToken);
 
             Mail::to($request->email)->send(new OfferCreated($locale, $confirmUrl));
 
