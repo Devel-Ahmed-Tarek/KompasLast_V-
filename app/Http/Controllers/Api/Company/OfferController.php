@@ -52,6 +52,7 @@ class OfferController extends Controller
         // مقارنة التاريخ - بما أن date من نوع date فقط، نستخدم whereDate
         // هذا سيعيد كل الـ offers التي تاريخها >= اليوم (يشمل نفس اليوم)
         $query = Offer::where('status', 1)
+            ->where('confirm_status', 'confirmed')
             ->where('count', '>', 0)
             ->whereDate('date', '>=', now()->format('Y-m-d'))
             ->whereHas('type', function ($query) use ($currentCompany) {
@@ -155,7 +156,7 @@ class OfferController extends Controller
         try {
             $offer = Offer::find($request->offer_id);
 
-            if (! $offer || $offer->status == 0) {
+            if (! $offer || $offer->status == 0 || $offer->confirm_status !== 'confirmed') {
                 return HelperFunc::sendResponse(403, "Offer is not available", []);
             }
 
@@ -415,6 +416,7 @@ class OfferController extends Controller
         // Check if offer exists and is available
         $offer = Offer::where('id', $offerId)
             ->where('status', 1)
+            ->where('confirm_status', 'confirmed')
             ->where('count', '>', 0)
             ->first();
 
@@ -478,6 +480,7 @@ class OfferController extends Controller
         $favorites = OfferFavorite::where('user_id', $user->id)
             ->whereHas('offer', function ($query) {
                 $query->where('status', 1)
+                    ->where('confirm_status', 'confirmed')
                     ->where('count', '>', 0)
                     ->whereDate('date', '>=', now()->format('Y-m-d'));
             })
