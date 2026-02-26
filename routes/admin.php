@@ -94,6 +94,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::post('offers', [AdminOfferController::class, 'store']);
     Route::get('offers', [AdminOfferController::class, 'getFilteredOffers']);
     Route::get('offers/{id}', [AdminOfferController::class, 'show']);
+    Route::post('offers/{id}/unit-price', [AdminOfferController::class, 'updateUnitPrice']);
 
     // Contacts management
     Route::get('contact', [AdminContactController::class, 'index']);
