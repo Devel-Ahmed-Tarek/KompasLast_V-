@@ -12,6 +12,7 @@ use App\Models\OfferAnswer;
 use App\Models\OfferAnswerFile;
 use App\Models\Shopping_list;
 use App\Models\TypeQuestion;
+use App\Models\Type;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -707,6 +708,12 @@ class OfferQuestionController extends Controller
                 'completion_status' => 'completed',
             ];
 
+            // حساب سعر البيع (لكل شركة) وتثبيته في الـ Offer
+            $typeModel     = Type::find($typeId);
+            $typePrice     = $typeModel?->price ?? 0;
+            $numberOffers  = max(1, (int) $offerData['Number_of_offers']);
+            $offerData['unit_price'] = $numberOffers > 0 ? $typePrice / $numberOffers : $typePrice;
+
             // التحقق من إعدادات النظام
             $config = ConfigApp::first();
             $status = true;
@@ -1257,7 +1264,9 @@ class OfferQuestionController extends Controller
                 $expenseTotal = $company->wallet->expense ?? 0;
                 $totalMoneyInWallet = $amountTotal - $expenseTotal;
 
-                return $totalMoneyInWallet >= ($offer->type->price / $offer->Number_of_offers);
+                $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
+
+                return $totalMoneyInWallet >= $offerPrice;
             });
 
             $sortedCompanies = $filteredCompanies->sortBy('shopping_list_count');

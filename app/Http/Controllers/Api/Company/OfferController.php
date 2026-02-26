@@ -193,7 +193,8 @@ class OfferController extends Controller
                 return HelperFunc::sendResponse(404, "Offer type not found", []);
             }
 
-            $offerPrice = $typeOffer->price / $offer->Number_of_offers;
+            // استخدم سعر البيع المثبت على الأوفر إن وجد، وإلا احسبه من سعر النوع الحالي
+            $offerPrice = $offer->unit_price ?? ($typeOffer->price / max(1, $offer->Number_of_offers));
 
             if ($offerPrice > $walletTotal) {
                 return HelperFunc::sendResponse(403, "Insufficient wallet balance. Please add funds.", []);

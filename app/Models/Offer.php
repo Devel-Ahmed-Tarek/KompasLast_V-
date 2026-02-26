@@ -41,6 +41,7 @@ class Offer extends Model
         'Nach_country',
         'Nach_zipcode',
         'completion_status',
+        'unit_price',
         'confirm_status',
         'confirm_token',
         'confirmed_at',
@@ -48,6 +49,7 @@ class Offer extends Model
 
     protected $casts = [
         'completion_status' => 'string',
+        'unit_price'        => 'float',
     ];
 
     // داخل نموذج Offer

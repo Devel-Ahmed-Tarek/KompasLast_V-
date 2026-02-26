@@ -24,9 +24,12 @@ class OfferWithAnswersResource extends JsonResource
             'country_id' => $this->country_id,
             'city_id' => $this->city_id,
             'type' => [
-                'id' => $this->type->id,
-                'name' => $this->type->getTranslation('name', $lang),
-                'price' => $this->type->price,
+                'id'         => $this->type->id,
+                'name'       => $this->type->getTranslation('name', $lang),
+                // السعر الحالي للخدمة (للعرض فقط)
+                'price'      => $this->type->price,
+                // سعر البيع المثبّت على الأوفر (ما يتأثرش بتغيير سعر الخدمة)
+                'unit_price' => $this->unit_price ?? ($this->type->price / max(1, $this->Number_of_offers)),
             ],
             'country' => $this->when($this->countryRelation, function () use ($lang) {
                 return [

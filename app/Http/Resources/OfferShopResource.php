@@ -74,7 +74,7 @@ class OfferShopResource extends JsonResource
             'type_id' => [
                 'id'    => $this->type_id,
                 'name'  => $this->type->getTranslation('name', $lang),
-                'price' => $this->type->price / $this->Number_of_offers,
+                'price' => $this->unit_price ?? ($this->type->price / max(1, $this->Number_of_offers)),
             ],
             'id'               => $this->id,
             'date'             => $this->date,

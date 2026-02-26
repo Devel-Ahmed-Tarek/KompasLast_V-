@@ -155,6 +155,12 @@ class HomePageController extends Controller
         try {
             $confirmToken = Str::random(64);
 
+            // احسب سعر البيع (لكل شركة) بناءً على سعر الخدمة الحالي
+            $type          = Type::find($request->type_id);
+            $typePrice     = $type?->price ?? 0;
+            $numberOffers  = max(1, (int) $request->count);
+            $unitPrice     = $numberOffers > 0 ? $typePrice / $numberOffers : $typePrice;
+
             $data = [
                 'type_id'          => $request->type_id,
                 'country_id'       => $request->country_id,
@@ -181,6 +187,7 @@ class HomePageController extends Controller
                 'execution_date'   => $request->execution_date,
                 'person_type'      => $request->person_type,
                 'Number_of_offers' => $request->count,
+                'unit_price'       => $unitPrice,
                 'Besonderheiten'   => $this->filterBesonderheiten($request->Besonderheiten ?? null),
                 'ip'               => $this->getClientIp($request),
                 'country'          => $request->country ?? $this->getCountryFromIP($this->getClientIp($request)),
@@ -342,7 +349,9 @@ class HomePageController extends Controller
             $expenseTotal       = $company->wallet->expense ?? 0;
             $totalMoneyInWallet = $amountTotal - $expenseTotal;
 
-            return $totalMoneyInWallet >= ($offer->type->price / $offer->Number_of_offers);
+            $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
+
+            return $totalMoneyInWallet >= $offerPrice;
         });
 
         $sortedCompanies = $filteredCompanies->sortBy('shopping_list_count');
@@ -360,10 +369,10 @@ class HomePageController extends Controller
                 'type'     => 'offer',
                 'offer_id' => $offer->id,
                 'mgs'      => [
-                    'en' => 'You have a new offer with: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
-                    'de' => 'Sie haben ein neues Angebot mit: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
-                    'it' => 'Hai una nuova offerta con: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
-                    'fr' => 'Vous avez une nouvelle offre avec: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
+                    'en' => 'You have a new offer with: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
+                    'de' => 'Sie haben ein neues Angebot mit: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
+                    'it' => 'Hai una nuova offerta con: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
+                    'fr' => 'Vous avez une nouvelle offre avec: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
                 ],
                 'serves'   => $offer->type->getTranslations('name'),
             ];
@@ -371,8 +380,8 @@ class HomePageController extends Controller
 
             $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
             HelperFunc::sendMultilangNotification($admins, 'offer_purchased', $offer->id, [
-                'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF.',
-                'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF gekauft.',
+                'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF.',
+                'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF gekauft.',
             ]);
             $this->sendMailtocompanyDataOfOffer($company, $offer);
             // تحديث عدد العروض المتاحة
@@ -381,7 +390,7 @@ class HomePageController extends Controller
             // تحديث محفظة المستخدم
             $company->wallet()->updateOrCreate(
                 [],
-                ['expense' => $company->wallet->expense + $offer->type->price]
+                ['expense' => $company->wallet->expense + ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers)))]
             );
             // إرسال بريد إلكتروني للشركة
         }

@@ -227,8 +227,11 @@ class CompanyProfileController extends Controller
                 continue; // Skip if already purchased
             }
 
+            // Calculate offer price per company (frozen on the offer if available)
+            $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
+
             // Check if company has enough funds to purchase the offer
-            if ($totalMoneyInWallet >= $offer->price) {
+            if ($totalMoneyInWallet >= $offerPrice) {
                 // Add offer to shopping list
                 Shopping_list::create([
                     'offer_id' => $offer->id,
@@ -244,10 +247,10 @@ class CompanyProfileController extends Controller
                     'type'     => 'offer',
                     'offer_id' => $offer->id,
                     'mgs'      => [
-                        'en' => 'You have a new offer with: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
-                        'de' => 'Sie haben ein neues Angebot mit: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
-                        'it' => 'Hai una nuova offerta con: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
-                        'fr' => 'Vous avez une nouvelle offre avec: ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF',
+                        'en' => 'You have a new offer with: ' . $offerPrice . ' CHF',
+                        'de' => 'Sie haben ein neues Angebot mit: ' . $offerPrice . ' CHF',
+                        'it' => 'Hai una nuova offerta con: ' . $offerPrice . ' CHF',
+                        'fr' => 'Vous avez une nouvelle offre avec: ' . $offerPrice . ' CHF',
                     ],
                     'serves'   => $offer->type->getTranslations('name'),
                 ];
@@ -258,7 +261,7 @@ class CompanyProfileController extends Controller
                 // Update the wallet expense for the company
                 $company->wallet()->updateOrCreate(
                     ['user_id' => $company->id],
-                    ['expense' => $company->wallet->expense - $offer->type->price / $offer->Number_of_offers]
+                    ['expense' => $company->wallet->expense + $offerPrice]
                 );
 
                 // Notify all admins about the offer purchase
@@ -268,12 +271,12 @@ class CompanyProfileController extends Controller
                     ->get();
 
                 HelperFunc::sendMultilangNotification($admins, 'offer_purchased', $offer->id, [
-                    'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF.',
-                    'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . ($offer->type->price / $offer->Number_of_offers) . ' CHF gekauft.',
+                    'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . $offerPrice . ' CHF.',
+                    'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . $offerPrice . ' CHF gekauft.',
                 ]);
 
                 // Deduct the offer price from the available wallet money
-                $totalMoneyInWallet -= $offer->price;
+                $totalMoneyInWallet -= $offerPrice;
             }
         }
     }
