@@ -24,10 +24,10 @@ class AdminTypeController extends Controller
             return response()->json($types, 200);
         }
 
-        // Return hierarchical structure (parents with children)
+        // Return hierarchical structure (each parent with all nested children)
         $types = Type::whereNull('parent_id')
             ->with(['children' => function ($query) {
-                $query->orderBy('order');
+                $query->orderBy('order')->with('children');
             }])
             ->orderBy('order')
             ->get();
