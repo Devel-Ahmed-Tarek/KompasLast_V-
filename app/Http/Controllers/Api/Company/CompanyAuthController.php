@@ -147,7 +147,7 @@ class CompanyAuthController extends Controller
             // إنشاء CompanyDetail
             DB::table('company_details')->insert([
                 'user_id'      => $userId,
-                'reg_name'     => $request->regNumber,
+                'reg_name'     => $request->regNumber ?: 'N/A',
                 'founded_year' => $request->foundedYear,
                 'owner_name'   => $request->ownerName,
                 'website'      => $request->website,
@@ -155,12 +155,12 @@ class CompanyAuthController extends Controller
                 'city'         => $request->city,
                 'ZIPCode'      => $request->ZIPCode,
                 'country'      => $request->country,
-                'phone2'       => $request->phone2 ?? null,
+                'phone2'       => $request->phone2 ?: 'N/A',
                 'banc_ip'      => $request->banc_ip,
                 'banc_count'   => $request->banc_count,
                 'banc_name'    => $request->banc_name,
                 'number'       => $request->mobileNumber,
-                'counties'     => 'jkfgh',
+                'counties'     => $request->counties ?: 'N/A',
                 'about'        => $request->about,
                 'created_at'   => now(),
                 'updated_at'   => now(),
