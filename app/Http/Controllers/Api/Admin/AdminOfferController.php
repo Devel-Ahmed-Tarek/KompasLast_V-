@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OfferWithAnswersResource;
 use App\Models\ConfigApp;
 use App\Models\Offer;
+use App\Models\Type;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -124,6 +125,12 @@ class AdminOfferController extends Controller
             return HelperFunc::sendResponse(422, 'هناك رسائل تحقق', $Validator->messages()->all());
         }
         try {
+            // حساب سعر البيع (لكل شركة) بناءً على سعر الخدمة الحالي وعدد الشركات
+            $type         = Type::find($request->type_id);
+            $typePrice    = $type?->price ?? 0;
+            $numberOffers = max(1, (int) $request->count);
+            $unitPrice    = $numberOffers > 0 ? $typePrice / $numberOffers : $typePrice;
+
             // Create the offer
             $offer = Offer::create([
                 'type_id'          => $request['type_id'],
@@ -145,6 +152,7 @@ class AdminOfferController extends Controller
                 'Nach_vorhanden'   => $request['Nach_vorhanden'] ?? null,
                 'count'            => $request['count'],
                 'Number_of_offers' => $request['count'],
+                'unit_price'       => $unitPrice,
                 'Besonderheiten'   => $this->filterBesonderheiten($request['Besonderheiten'] ?? null),
                 'ip'               => $request->ip(),
                 'country'          => $request['country'] ?? $this->getCountryFromIP($request->ip()),
@@ -247,6 +255,29 @@ class AdminOfferController extends Controller
 
         $offer->update($validatedData); // Update the offer
         return response()->json($offer);
+    }
+
+    /**
+     * تحديث سعر البيع (unit_price) لأوفر معيّن من لوحة السوبر أدمن
+     */
+    public function updateUnitPrice(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'unit_price' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors());
+        }
+
+        $offer = Offer::findOrFail($id);
+        $offer->unit_price = $request->unit_price;
+        $offer->save();
+
+        return HelperFunc::sendResponse(200, 'Unit price updated successfully', [
+            'offer_id'   => $offer->id,
+            'unit_price' => $offer->unit_price,
+        ]);
     }
 
     // Delete an offer
