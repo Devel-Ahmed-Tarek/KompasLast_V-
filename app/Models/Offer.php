@@ -42,6 +42,7 @@ class Offer extends Model
         'Nach_zipcode',
         'completion_status',
         'unit_price',
+        'status',
         'confirm_status',
         'confirm_token',
         'confirmed_at',
