@@ -572,6 +572,7 @@ class OfferQuestionController extends Controller
         $lang = $request->get('lang', 'en');
         App::setLocale($lang);
         $config = ConfigApp::first();
+        $status = true;
 
         if ($config->offer_flow == 1) {
             $status = false;
@@ -705,6 +706,7 @@ class OfferQuestionController extends Controller
                 'city' => $request->city ?? $this->getCityFromIP($this->getClientIp($request)),
                 'lang' => $lang,
                 'cheek' => true,
+                'status' => $status,
                 'completion_status' => 'completed',
             ];
 

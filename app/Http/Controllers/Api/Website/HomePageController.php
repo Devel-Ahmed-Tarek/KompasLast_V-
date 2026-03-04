@@ -104,6 +104,7 @@ class HomePageController extends Controller
 
         $config = ConfigApp::first();
 
+        return $config;
         if ($config->offer_flow == 1) {
             $status = false;
         }
