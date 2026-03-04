@@ -15,9 +15,12 @@ use App\Models\Shopping_list;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
+use App\Mail\OfferPurchasedCompany;
+use App\Mail\OfferPurchasedAdmin;
 
 class OfferController extends Controller
 {
@@ -238,13 +241,21 @@ class OfferController extends Controller
             // Update wallet expense
             $user->wallet()->updateOrCreate([], ['expense' => $expenseTotal]);
 
-            // send notification to Admin
+            // send notification to Admin (in-app)
             $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
 
             HelperFunc::sendMultilangNotification($admins, "offer_purchased", $offer->id, [
                 'en' => 'The offer "' . $offer->name . '" has been purchased by the company: ' . $user->name . '.' . "\n" . 'The offer price is: ' . $offerPrice . ' CHF',
                 'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma ' . $user->name . ' gekauft. ' . "\n" . 'Der Angebotspreis ist: ' . $offerPrice . ' CHF',
             ]);
+
+            // send emails: to company and to global info mailbox
+            try {
+                Mail::to($user->email)->send(new OfferPurchasedCompany($offer, $user, $offerPrice));
+                Mail::to('info@auftagkompass.de')->send(new OfferPurchasedAdmin($offer, $user, $offerPrice));
+            } catch (\Exception $e) {
+                // ignore mail transport errors
+            }
             DB::commit();
             return HelperFunc::sendResponse(201, __('messages.offer_purchased_successfully'), []);
         } catch (\Exception $e) {

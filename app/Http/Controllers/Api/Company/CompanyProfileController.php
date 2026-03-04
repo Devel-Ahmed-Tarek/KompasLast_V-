@@ -18,6 +18,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\OfferPurchasedCompany;
+use App\Mail\OfferPurchasedAdmin;
 
 class CompanyProfileController extends Controller
 {
@@ -255,7 +258,7 @@ class CompanyProfileController extends Controller
                     'serves'   => $offer->type->getTranslations('name'),
                 ];
 
-                // Notify the company
+                // Notify the company (in-app)
                 $company->notify(new PaymentNotification($data));
 
                 // Update the wallet expense for the company
@@ -277,6 +280,14 @@ class CompanyProfileController extends Controller
 
                 // Deduct the offer price from the available wallet money
                 $totalMoneyInWallet -= $offerPrice;
+
+                // Send emails to company and info@
+                try {
+                    Mail::to($company->email)->send(new OfferPurchasedCompany($offer, $company, $offerPrice));
+                    Mail::to('info@auftagkompass.de')->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
+                } catch (\Exception $e) {
+                    // ignore mail errors
+                }
             }
         }
     }

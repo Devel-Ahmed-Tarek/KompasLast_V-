@@ -26,6 +26,9 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Location;
+use App\Mail\OfferPurchasedCompany;
+use App\Mail\OfferPurchasedAdmin;
+use App\Mail\NewOfferForCompany;
 
 class HomePageController extends Controller
 {
@@ -300,14 +303,69 @@ class HomePageController extends Controller
             $offer->confirmed_at   = now();
             $offer->save();
 
+            // إرسال إيميل إشعار لكل الشركات المناسبة أن هناك أوفر جديد في الشوب
+            $this->notifyCompaniesNewOffer($offer);
+
+            // المنطق القديم للـ Dynamic Buy (لو مفعّل بالإعدادات)
             $this->bayOffer($offer->id);
 
             DB::commit();
-            // بعد نجاح التأكيد والبيع الديناميك نرجع المستخدم لصفحة التأكيد في الـ Frontend
+            // بعد نجاح التأكيد نرجع المستخدم لصفحة التأكيد في الـ Frontend
             return HelperFunc::sendResponse('200', 'success', []);
         } catch (\Exception $e) {
             DB::rollBack();
             return HelperFunc::sendResponse(500, 'An error occurred while confirming the offer: ' . $e->getMessage(), []);
+        }
+    }
+
+    /**
+     * إرسال إيميل لكل الشركات اللي مواصفاتها مناسبة للأوفر
+     * بدون شراء، فقط إشعار بوجود أوفر جديد في الشوب
+     */
+    private function notifyCompaniesNewOffer(Offer $offer): void
+    {
+        try {
+            // لازم يكون للأوفر دولة ومدينة عشان نطابق على اشتراك الشركات
+            if (!$offer->country_id || !$offer->city_id) {
+                return;
+            }
+
+            $companies = User::where('role', 'company')
+                ->where('ban', '0')
+                ->where('status', '1')
+                ->whereHas('companyDetails', function ($query) {
+                    $query->where('sucsses', '1');
+                })
+                // نفس نوع الخدمة
+                ->whereHas('typesComapny', function ($query) use ($offer) {
+                    $query->where('type_id', $offer->type_id);
+                })
+                // مشترك في نفس الدولة
+                ->whereHas('countries', function ($query) use ($offer) {
+                    $query->where('country_id', $offer->country_id);
+                })
+                // ومشترك في نفس المدينة
+                ->whereHas('cities', function ($query) use ($offer) {
+                    $query->where('city_id', $offer->city_id);
+                })
+                ->get();
+
+            if ($companies->isEmpty()) {
+                return;
+            }
+
+            $price = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers ?: 1));
+
+            foreach ($companies as $company) {
+                try {
+                    Mail::to($company->email)->send(new NewOfferForCompany($offer, $company, $price));
+                } catch (\Exception $e) {
+                    // تجاهل خطأ شركة واحدة ونكمل لباقي الشركات
+                    continue;
+                }
+            }
+        } catch (\Exception $e) {
+            // لو حصل أي خطأ عام، ما نكسرش عملية التأكيد
         }
     }
 
@@ -364,7 +422,7 @@ class HomePageController extends Controller
                 'type'     => 'D', // نوع الشراء
             ]);
 
-            // إرسال إشعار للدفع
+            // إرسال إشعار للدفع (داخل التطبيق)
             $data = [
                 'type'     => 'offer',
                 'offer_id' => $offer->id,
@@ -392,7 +450,15 @@ class HomePageController extends Controller
                 [],
                 ['expense' => $company->wallet->expense + ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers)))]
             );
-            // إرسال بريد إلكتروني للشركة
+
+            // إرسال بريد إلكتروني للشركة + بريد إلى info@
+            try {
+                $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
+                Mail::to($company->email)->send(new OfferPurchasedCompany($offer, $company, $offerPrice));
+                Mail::to('info@auftagkompass.de')->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
+            } catch (\Exception $e) {
+                // تجاهل أخطاء الإرسال
+            }
         }
     }
 
