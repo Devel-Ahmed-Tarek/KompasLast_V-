@@ -15,15 +15,19 @@ class OfferSelling extends Mailable
      *
      */
     public $offer;
+    public $locale;
 
     /**
      * Create a new message instance.
      *
-     * @param array $offer
+     * @param array       $offer
+     * @param string|null $locale
      */
-    public function __construct($offer)
+    public function __construct($offer, ?string $locale = null)
     {
-        $this->offer = $offer;
+        $this->offer  = $offer;
+        // لو الفورم فيها لغة نبعتهالك هنا، وإلا خليه ألماني ديفولت
+        $this->locale = $locale ?? 'de';
     }
 
     /**
@@ -31,10 +35,13 @@ class OfferSelling extends Mailable
      */
     public function build()
     {
+        app()->setLocale($this->locale);
+
         return $this->view('email.OfferSelling')
-            ->subject('New Offer Created')->with([
-            'offer' => $this->offer,
-        ]);
+            ->subject(__('offer_selling.subject'))
+            ->with([
+                'offer' => $this->offer,
+            ]);
     }
 
 }

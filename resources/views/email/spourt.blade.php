@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Question</title>
+    <title>{{ __('support_question.title', ['name' => $emailData['name']]) }}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -38,14 +38,14 @@
 
 <body>
     <div class="container">
-        <h2>New Question from {{ $emailData['name'] }}</h2>
-        <p><strong>Email:</strong> {{ $emailData['email'] }}</p>
-        <p><strong>Question:</strong></p>
+        <h2>{{ __('support_question.title', ['name' => $emailData['name']]) }}</h2>
+        <p><strong>{{ __('support_question.email') }}:</strong> {{ $emailData['email'] }}</p>
+        <p><strong>{{ __('support_question.question_label') }}:</strong></p>
         <p>{{ $emailData['question'] }}</p>
-        <p>Thank you!</p>
+        <p>{{ __('support_question.thanks') }}</p>
     </div>
     <div class="footer">
-        This message was sent automatically. Please do not reply to this email.
+        {{ __('support_question.footer') }}
     </div>
 </body>
 

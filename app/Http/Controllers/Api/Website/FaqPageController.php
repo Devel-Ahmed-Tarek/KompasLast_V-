@@ -41,11 +41,15 @@ class FaqPageController extends Controller
             'name' => $validated['name'],
             'question' => $validated['question'],
         ];
+
+        // Determine locale (from request or default)
+        $lang = $request->get('lang', 'en');
+        app()->setLocale($lang);
         // Send the email
         try {
             Mail::send('email.spourt', ['emailData' => $emailData], function ($message) use ($validated, $email) {
                 $message->to($email) // Company's email from configuration
-                    ->subject("Message from User: {$validated['name']}");
+                    ->subject(__('support_question.subject', ['name' => $validated['name']]));
             });
             return HelperFunc::apiResponse(200, 'Your question has been sent successfully!', []);
         } catch (\Exception $e) {

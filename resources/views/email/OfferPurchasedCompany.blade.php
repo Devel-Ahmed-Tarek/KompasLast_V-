@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
-    <title>Neuer Auftrag gekauft</title>
+    <title>{{ __('offer_purchased_company.subject') }}</title>
 </head>
 <body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:20px;">
 <table width="100%" cellspacing="0" cellpadding="0">
@@ -11,23 +11,24 @@
             <table width="600" cellspacing="0" cellpadding="20" style="background:#ffffff; border:1px solid #e5e7eb;">
                 <tr>
                     <td>
-                        <h2 style="margin-top:0;">🎉 Glückwunsch zu Ihrem neuen Auftrag!</h2>
-                        <p>Guten Tag {{ $company->name ?? '' }},</p>
+                        <h2 style="margin-top:0;">{{ __('offer_purchased_company.title') }}</h2>
+                        <p>{{ __('offer_purchased_company.hello', ['name' => $company->name ?? '' ]) }}</p>
                         <p>
-                            <strong>Sie haben soeben einen neuen Offer gekauft.</strong>
+                            <strong>{{ __('offer_purchased_company.intro') }}</strong>
                         </p>
                         <p>
-                            <strong>Offer-ID:</strong> {{ $offer->id }}<br>
-                            <strong>Name:</strong> {{ $offer->name }}<br>
-                            <strong>Preis:</strong> {{ number_format($price, 2, ',', '\'') }} CHF<br>
-                            <strong>Datum:</strong> {{ optional($offer->created_at)->format('d.m.Y H:i') }}
+                            <strong>{{ __('offer_purchased_company.offer_id') }}:</strong> {{ $offer->id }}<br>
+                            <strong>{{ __('offer_purchased_company.name') }}:</strong> {{ $offer->name }}<br>
+                            <strong>{{ __('offer_purchased_company.price') }}:</strong>
+                            {{ number_format($price, 2, app()->getLocale() === 'de' ? ',' : '.', '\'') }} CHF<br>
+                            <strong>{{ __('offer_purchased_company.date') }}:</strong> {{ optional($offer->created_at)->format('d.m.Y H:i') }}
                         </p>
                         <p>
-                            Bitte loggen Sie sich in Ihr Firmenkonto ein, um die vollständigen Auftragsdetails einzusehen und den Kunden zu kontaktieren.
+                            {{ __('offer_purchased_company.action') }}
                         </p>
                         <p style="margin-top:30px;">
-                            Freundliche Grüsse<br>
-                            Ihr AuftragKompass-Team
+                            {{ __('offer_purchased_company.regards') }}<br>
+                            {{ __('offer_purchased_company.team') }}
                         </p>
                     </td>
                 </tr>

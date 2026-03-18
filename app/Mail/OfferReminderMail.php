@@ -14,15 +14,20 @@ class OfferReminderMail extends Mailable
     use Queueable, SerializesModels;
 
     public $offer;
+    public $locale;
 
-    public function __construct(Offer $offer)
+    public function __construct(Offer $offer, ?string $locale = null)
     {
-        $this->offer = $offer;
+        $this->offer  = $offer;
+        // لغة العميل لو موجودة في الأوفر، أو براميتر، أو إنجليزي ديفولت
+        $this->locale = $locale ?? ($offer->lang ?? null) ?? 'en';
     }
 
     public function build()
     {
-        return $this->subject('Reminder: Offer Execution Date Passed')
+        app()->setLocale($this->locale);
+
+        return $this->subject(__('offer_reminder.subject'))
             ->view('emails.offer_reminder')
             ->with([
                 'offer' => $this->offer,

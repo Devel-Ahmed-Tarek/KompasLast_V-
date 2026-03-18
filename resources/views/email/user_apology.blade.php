@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
+    <title>{{ __('user_apology.subject') }}</title>
 </head>
 
 <body>
-    <p>Dear {{ $complaint->user_name }},</p>
-    <p>We regret to inform you that your complaint has been rejected. Below are the details:</p>
+    <p>{{ __('user_apology.greeting', ['name' => $complaint->user_name]) }}</p>
+    <p>{{ __('user_apology.intro') }}</p>
     <ul>
-        <li><strong>Email:</strong> {{ $complaint->email }}</li>
-        <li><strong>Complaint:</strong> {{ $complaint->complain }}</li>
+        <li><strong>{{ __('user_apology.email') }}:</strong> {{ $complaint->email }}</li>
+        <li><strong>{{ __('user_apology.complaint') }}:</strong> {{ $complaint->complain }}</li>
     </ul>
-    <p>We apologize for the inconvenience caused. Please feel free to contact us if you have any further questions.</p>
-    <p>Best regards,<br>Compass Team</p>
+    <p>{{ __('user_apology.apology') }}</p>
+    <p>{{ __('user_apology.regards') }}<br>{{ __('user_apology.team') }}</p>
 
 </body>
 

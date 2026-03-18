@@ -7,18 +7,25 @@ class SupportNotification extends Mailable
 {
     public $complaint;
     public $action;
+    public $locale;
 
-    public function __construct($complaint, $action)
+    public function __construct($complaint, $action, ?string $locale = null)
     {
         $this->complaint = $complaint;
         $this->action    = $action;
+        $this->locale    = $locale ?? 'en';
     }
 
     public function build()
     {
-        $subject = $this->action === 'approved' ? 'Complaint Approved' : 'Complaint Rejected';
+        app()->setLocale($this->locale);
+
+        $subjectKey = $this->action === 'approved'
+            ? 'support_notification.subject_approved'
+            : 'support_notification.subject_rejected';
+
         return $this->view('email.support_notification')
-            ->subject($subject)
+            ->subject(__($subjectKey))
             ->with([
                 'complaint' => $this->complaint,
                 'action'    => $this->action,

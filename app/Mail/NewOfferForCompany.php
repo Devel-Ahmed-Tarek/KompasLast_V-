@@ -13,23 +13,32 @@ class NewOfferForCompany extends Mailable
     public $offer;
     public $company;
     public $price;
+    public $locale;
 
     /**
-     * @param  mixed  $offer
-     * @param  mixed  $company
-     * @param  float|null  $price
+     * @param  mixed      $offer
+     * @param  mixed      $company
+     * @param  float|null $price
+     * @param  string|null $locale
      */
-    public function __construct($offer, $company, ?float $price = null)
+    public function __construct($offer, $company, ?float $price = null, ?string $locale = null)
     {
-        $this->offer  = $offer;
+        $this->offer   = $offer;
         $this->company = $company;
         $this->price   = $price;
+
+        // حاول نستخدم لغة الشركة لو موجودة، وإلا خُد اللي جاي من البراميتر أو default=en
+        $this->locale = $locale
+            ?? ($company->lang ?? $company->language ?? null)
+            ?? 'de';
     }
 
     public function build()
     {
+        app()->setLocale($this->locale);
+
         return $this->view('email.NewOfferForCompany')
-            ->subject('Neues Angebot in Ihrem AuftragKompass-Konto');
+            ->subject(__('new_offer_company.subject'));
     }
 }
 

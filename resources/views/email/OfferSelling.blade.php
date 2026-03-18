@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="UTF-8">
-    <title>Reinigung Offertenanfrage</title>
+    <title>{{ __('offer_selling.subject') }}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -72,34 +72,36 @@
 <body>
 
     <div class="container">
-        <div class="header">Eine neue Reinigung Offertenanfrage ist soeben eingetroffen.</div>
+        <div class="header">{{ __('offer_selling.header') }}</div>
 
-        <div class="title">🧹 Reinigung Offertenanfrage {{ $offer['id'] ?? 'XXXXXX' }}:</div>
+        <div class="title">
+            {{ __('offer_selling.title', ['id' => $offer['id'] ?? 'XXXXXX']) }}
+        </div>
 
         <div class="info">
-            <p><b>Kategorie:</b> {{ $offer['category'] ?? 'Umzugsreinigung' }}</p>
-            <p><b>Kontaktwunsch:</b> {{ $offer['contact_type'] ?? 'Grobofferte / Beratung' }}</p>
-            <p><b>Datum:</b> {{ $offer['date'] ?? 'Mittwoch, 02.07.2025' }}</p>
-            <p><b>Objekt:</b> {{ $offer['object'] ?? 'Wohnung' }}</p>
-            <p><b>Anzahl Zimmer:</b> {{ $offer['rooms'] ?? '3 Zimmer' }}</p>
-            <p><b>Abnahmegarantie:</b> {{ $offer['guarantee'] ?? 'Ja' }}</p>
-            <p><b>Objekt Fläche:</b> {{ $offer['area'] ?? '75 m2' }}</p>
-            <p><b>Verschmutzung:</b> {{ $offer['dirt_level'] ?? 'Mittel schmutzig' }}</p>
-            <p><b>Bereiche:</b> {{ $offer['areas'] ?? 'Laminat, Teppich, Fensterscheiben, Storen/Rolladen' }}</p>
-            <p><b>Standort:</b> {{ $offer['location'] ?? '3098 Köniz, CH' }}</p>
-            <p><b>Entfernung:</b> {{ $offer['distance'] ?? '7 KM (Luftlinien Distanz)' }}</p>
-            <p><b>Fokus:</b> {{ $offer['focus'] ?? 'Qualität' }}</p>
-            <p><b>Rabatt:</b> {{ $offer['discount'] ?? '30% Rabatt, weil Person nur Email angegeben hat' }}</p>
+            <p><b>{{ __('offer_selling.category') }}:</b> {{ $offer['category'] ?? 'Umzugsreinigung' }}</p>
+            <p><b>{{ __('offer_selling.contact_type') }}:</b> {{ $offer['contact_type'] ?? 'Grobofferte / Beratung' }}</p>
+            <p><b>{{ __('offer_selling.date') }}:</b> {{ $offer['date'] ?? 'Mittwoch, 02.07.2025' }}</p>
+            <p><b>{{ __('offer_selling.object') }}:</b> {{ $offer['object'] ?? 'Wohnung' }}</p>
+            <p><b>{{ __('offer_selling.rooms') }}:</b> {{ $offer['rooms'] ?? '3 Zimmer' }}</p>
+            <p><b>{{ __('offer_selling.guarantee') }}:</b> {{ $offer['guarantee'] ?? 'Ja' }}</p>
+            <p><b>{{ __('offer_selling.area') }}:</b> {{ $offer['area'] ?? '75 m2' }}</p>
+            <p><b>{{ __('offer_selling.dirt_level') }}:</b> {{ $offer['dirt_level'] ?? 'Mittel schmutzig' }}</p>
+            <p><b>{{ __('offer_selling.areas') }}:</b> {{ $offer['areas'] ?? 'Laminat, Teppich, Fensterscheiben, Storen/Rolladen' }}</p>
+            <p><b>{{ __('offer_selling.location') }}:</b> {{ $offer['location'] ?? '3098 Köniz, CH' }}</p>
+            <p><b>{{ __('offer_selling.distance') }}:</b> {{ $offer['distance'] ?? '7 KM (Luftlinien Distanz)' }}</p>
+            <p><b>{{ __('offer_selling.focus') }}:</b> {{ $offer['focus'] ?? 'Qualität' }}</p>
+            <p><b>{{ __('offer_selling.discount') }}:</b> {{ $offer['discount'] ?? '30% Rabatt, weil Person nur Email angegeben hat' }}</p>
         </div>
 
         <div class="button">
-            <a href="#" class="btn">Auftraggeber kontaktieren</a>
+            <a href="#" class="btn">{{ __('offer_selling.btn_contact') }}</a>
         </div>
 
         <div class="footer">
-            <p><a href="#">Anfrage nicht relevant? Filter einstellen</a></p>
-            <p><a href="#">Region nicht relevant? Regionen einstellen</a></p>
-            <p><a href="#">Weitere Fragen? Zum Supportbereich mit Hilfe Videos</a></p>
+            <p><a href="#">{{ __('offer_selling.link_filter') }}</a></p>
+            <p><a href="#">{{ __('offer_selling.link_regions') }}</a></p>
+            <p><a href="#">{{ __('offer_selling.link_support') }}</a></p>
         </div>
     </div>
 

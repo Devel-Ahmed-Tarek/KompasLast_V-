@@ -29,6 +29,7 @@ use Location;
 use App\Mail\OfferPurchasedCompany;
 use App\Mail\OfferPurchasedAdmin;
 use App\Mail\NewOfferForCompany;
+use App\Mail\AdminNewOffer;
 
 class HomePageController extends Controller
 {
@@ -207,7 +208,8 @@ class HomePageController extends Controller
             ];
 
             $offerId = DB::table('offers')->insertGetId($data);
-            $offer   = DB::table('offers')->where('id', $offerId)->first();
+            /** @var \App\Models\Offer $offerModel */
+            $offerModel = Offer::find($offerId);
 
             // send email to user with confirmation link (web route, no /api prefix)
             $locale     = $request->lang;
@@ -215,12 +217,22 @@ class HomePageController extends Controller
 
             Mail::to($request->email)->send(new OfferCreated($locale, $confirmUrl));
 
+            // send informational email to admin that a new offer entered the system
+            try {
+                $adminEmail = config('mail.admin_info', 'info@auftragkompass.com');
+                if ($offerModel && $adminEmail) {
+                    Mail::to($adminEmail)->send(new AdminNewOffer($offerModel));
+                }
+            } catch (\Exception $e) {
+                // لا نكسر الفلو لو إيميل الأدمن فشل
+            }
+
             $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
             HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offer->id, [
                 'en' => 'A new offer "' . $offer->name,
                 'de' => 'Ein neues Angebot "' . $offer->name,
             ]);
-            return HelperFunc::sendResponse(201, 'Offer created successfully. Please confirm your offer from the email.', $offer);
+            return HelperFunc::sendResponse(201, 'Offer created successfully. Please confirm your offer from the email.', $offerModel ?? $data);
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }

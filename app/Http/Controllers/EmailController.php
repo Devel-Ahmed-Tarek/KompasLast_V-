@@ -25,6 +25,10 @@ class EmailController extends Controller
             return HelperFunc::apiResponse(false, 404, ['User not found.']);
         }
 
+        // Set locale if provided
+        $lang = $request->get('lang', 'en');
+        app()->setLocale($lang);
+
         try {
             // Step 3: Prepare email data
             $emailData = [
@@ -35,7 +39,7 @@ class EmailController extends Controller
 
             Mail::send('email.company_message', ['emailData' => $emailData], function ($message) use ($validated, $user) {
                 $message->to($validated['to'])
-                    ->subject("Message from User: {$user->name}");
+                    ->subject(__('company_message.subject', ['name' => $user->name]));
             });
 
             // Step 5: Return success response

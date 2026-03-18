@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
-    <title>Neuer Offer-Kauf</title>
+    <title>{{ __('offer_purchased_admin.subject') }}</title>
 </head>
 <body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:20px;">
 <table width="100%" cellspacing="0" cellpadding="0">
@@ -11,24 +11,25 @@
             <table width="600" cellspacing="0" cellpadding="20" style="background:#ffffff; border:1px solid #e5e7eb;">
                 <tr>
                     <td>
-                        <h2 style="margin-top:0;">🧾 Neuer Offer-Kauf</h2>
-                        <p>Hallo AuftragKompass-Team,</p>
+                        <h2 style="margin-top:0;">{{ __('offer_purchased_admin.title') }}</h2>
+                        <p>{{ __('offer_purchased_admin.hello') }}</p>
                         <p>
-                            Die Firma <strong>{{ $company->name ?? '' }}</strong> hat soeben einen neuen Offer gekauft.
+                            {{ __('offer_purchased_admin.intro', ['company_name' => $company->name ?? '' ]) }}
                         </p>
                         <p>
-                            <strong>Offer-ID:</strong> {{ $offer->id }}<br>
-                            <strong>Offer-Name:</strong> {{ $offer->name }}<br>
-                            <strong>Firma:</strong> {{ $company->name }} (ID: {{ $company->id }})<br>
-                            <strong>Preis:</strong> {{ number_format($price, 2, ',', '\'') }} CHF<br>
-                            <strong>Kaufdatum:</strong> {{ now()->format('d.m.Y H:i') }}
+                            <strong>{{ __('offer_purchased_admin.offer_id') }}:</strong> {{ $offer->id }}<br>
+                            <strong>{{ __('offer_purchased_admin.offer_name') }}:</strong> {{ $offer->name }}<br>
+                            <strong>{{ __('offer_purchased_admin.company') }}:</strong> {{ $company->name }} (ID: {{ $company->id }})<br>
+                            <strong>{{ __('offer_purchased_admin.price') }}:</strong>
+                            {{ number_format($price, 2, app()->getLocale() === 'de' ? ',' : '.', '\'') }} CHF<br>
+                            <strong>{{ __('offer_purchased_admin.date') }}:</strong> {{ now()->format('d.m.Y H:i') }}
                         </p>
                         <p>
-                            Diese Nachricht wurde automatisch an <strong>info@auftagkompass.de</strong> gesendet.
+                            {{ __('offer_purchased_admin.info_note', ['email' => 'info@auftagkompass.de']) }}
                         </p>
                         <p style="margin-top:30px;">
-                            Viele Grüsse<br>
-                            Ihr SystemauftragKompass
+                            {{ __('offer_purchased_admin.regards') }}<br>
+                            {{ __('offer_purchased_admin.system') }}
                         </p>
                     </td>
                 </tr>

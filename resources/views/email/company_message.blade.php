@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Complaint Rejection</title>
+    <title>{{ __('company_message.subject', ['name' => $emailData['user_name']]) }}</title>
 </head>
 
 <body>
-    <p>Dear {{ $emailData['user_name'] }},</p>
-    <p>We regret to inform you that your complaint has been rejected. Below are the details:</p>
+    <p>{{ __('company_message.greeting', ['name' => $emailData['user_name']]) }}</p>
+    <p>{{ __('company_message.intro') }}</p>
     <ul>
-        <li><strong>Email:</strong> {{ $emailData['user_email'] }}</li>
-        <li><strong>Body:</strong> {!! $emailData['message_body'] !!}</li>
+        <li><strong>{{ __('company_message.email') }}:</strong> {{ $emailData['user_email'] }}</li>
+        <li><strong>{{ __('company_message.body_label') }}:</strong> {!! $emailData['message_body'] !!}</li>
     </ul>
-    <p>We apologize for the inconvenience caused. Please feel free to contact us if you have any further questions.</p>
-    <p>Best regards,<br>Compass Team</p>
+    <p>{{ __('company_message.apology') }}</p>
+    <p>{{ __('company_message.regards') }}<br>{{ __('company_message.team') }}</p>
 </body>
 
 </html>

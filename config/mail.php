@@ -113,4 +113,15 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Info Email
+    |--------------------------------------------------------------------------
+    |
+    | Central email address to notify admins when a new offer is created.
+    |
+    */
+
+    'admin_info' => env('MAIL_ADMIN_INFO', 'info@auftragkompass.com'),
+
 ];

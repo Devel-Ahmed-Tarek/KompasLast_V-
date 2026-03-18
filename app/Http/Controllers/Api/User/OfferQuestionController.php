@@ -6,6 +6,7 @@ use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Website\QuestionResource;
 use App\Mail\OfferCreated;
+use App\Mail\AdminNewOffer;
 use App\Models\ConfigApp;
 use App\Models\Offer;
 use App\Models\OfferAnswer;
@@ -634,12 +635,7 @@ class OfferQuestionController extends Controller
         try {
             DB::beginTransaction();
 
-            Log::info('=== Starting Offer Form Submission ===', [
-                'type_id' => $request->type_id,
-                'name' => $request->name,
-                'email' => $request->email,
-                'lang' => $lang
-            ]);
+    
 
             // معالجة form-data: جمع جميع question_ids من البيانات
             $typeId = $request->type_id;
@@ -648,11 +644,7 @@ class OfferQuestionController extends Controller
             // جمع question_ids من answers
             if ($request->has('answers')) {
                 $answers = $request->input('answers', []);
-                Log::info('Answers input received', [
-                    'answers_count' => count($answers),
-                    'answers_keys' => array_keys($answers)
-                ]);
-
+             
                 foreach ($answers as $key => $answerData) {
                     if (is_array($answerData) && isset($answerData['question_id'])) {
                         $questionIds[] = $answerData['question_id'];
@@ -663,10 +655,7 @@ class OfferQuestionController extends Controller
             }
 
             $questionIds = array_unique($questionIds);
-            Log::info('Question IDs collected', [
-                'question_ids' => $questionIds,
-                'count' => count($questionIds)
-            ]);
+        
 
             $questions = TypeQuestion::whereIn('id', $questionIds)
                 ->where('type_id', $typeId)
@@ -740,41 +729,17 @@ class OfferQuestionController extends Controller
             // إنشاء الـ Offer
             $offer = Offer::create($offerData);
 
-            Log::info('Offer created successfully', [
-                'offer_id' => $offer->id,
-                'type_id' => $offer->type_id,
-                'name' => $offer->name,
-                'email' => $offer->email,
-                'phone' => $offer->phone,
-                'completion_status' => $offer->completion_status,
-                'created_at' => $offer->created_at
-            ]);
+        
 
             // حفظ كل الإجابات مرتبة
             $savedAnswers = [];
             $allFiles = $request->allFiles(); // الحصول على جميع الملفات
 
-            Log::info('=== Processing Answers ===', [
-                'offer_id' => $offer->id,
-                'total_questions' => count($questionIds),
-                'allFiles_keys' => array_keys($allFiles),
-                'allFiles_structure' => array_map(function ($key) use ($allFiles) {
-                    return [
-                        'key' => $key,
-                        'type' => gettype($allFiles[$key] ?? null),
-                        'is_array' => is_array($allFiles[$key] ?? null)
-                    ];
-                }, array_keys($allFiles))
-            ]);
 
             // معالجة answers من form-data
             $answersInput = $request->input('answers', []);
 
-            Log::info('Answers input structure', [
-                'answers_count' => count($answersInput),
-                'answers_keys' => array_keys($answersInput),
-                'answers_sample' => array_slice($answersInput, 0, 3, true) // أول 3 إجابات فقط للعرض
-            ]);
+            
 
             foreach ($questionIds as $questionId) {
                 $question = $questions->firstWhere('id', $questionId);
@@ -1080,11 +1045,30 @@ class OfferQuestionController extends Controller
                     $confirmUrl = "https://auftragkompass.de/" . $lang . "/confirm-offer/?token=" . $offer->confirm_token;
                     Mail::to($request->email)->send(new OfferCreated($lang, $confirmUrl));
                 } catch (\Exception $e) {
+                    Log::error('Error sending user email', ['error' => $e->getMessage()]);
                     // تجاهل خطأ البريد الإلكتروني
                 }
             }
 
-            // إرسال إشعار للـ Admins
+            // إرسال إيميل تعريفي للأدمن عن الأوفر الجديد (يروح على إيميل info)
+            try {
+                $adminEmail = config('mail.admin_info', 'info@auftragkompass.com');
+                if ($adminEmail) {
+                    Mail::to($adminEmail)->send(new AdminNewOffer($offer));
+                }
+            } catch (\Exception $e) {
+                Log::error('Error sending admin email', ['error' => $e->getMessage()]);
+                // تجاهل أي خطأ في إيميل الأدمن
+            }
+
+            // إرسال إيميل تعريفي للشركات المناسبة (نفس النوع + نفس الدولة + نفس المدينة + مش محظورة)
+            try {
+                $this->notifyCompaniesNewOfferFromQuestions($offer);
+            } catch (\Exception $e) {
+                Log::error('Error sending company intro emails', ['error' => $e->getMessage()]);
+            }
+
+            // إرسال إشعار للـ Admins داخل السيستم
             try {
                 $admins = User::where('role', 'admin')->where('available_notification', '1')->get();
                 HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offer->id, [
@@ -1093,40 +1077,16 @@ class OfferQuestionController extends Controller
                 ]);
             } catch (\Exception $e) {
                 // تجاهل خطأ الإشعارات
+                Log::error('Error sending admin notification', ['error' => $e->getMessage()]);
             }
 
             DB::commit();
 
-            Log::info('=== Transaction Committed ===', [
-                'offer_id' => $offer->id,
-                'saved_answers_count' => count($savedAnswers),
-                'saved_answers' => $savedAnswers
-            ]);
+          
 
             // جلب الـ Offer مع الإجابات
             $offer->load(['answers.question', 'answers.options', 'answers.files']);
 
-            Log::info('=== Final Offer Data ===', [
-                'offer_id' => $offer->id,
-                'total_answers' => $offer->answers->count(),
-                'answers_with_files' => $offer->answers->filter(function ($answer) {
-                    return $answer->files->count() > 0;
-                })->map(function ($answer) {
-                    return [
-                        'answer_id' => $answer->id,
-                        'question_id' => $answer->question_id,
-                        'files_count' => $answer->files->count(),
-                        'files' => $answer->files->map(function ($file) {
-                            return [
-                                'file_id' => $file->id,
-                                'file_name' => $file->file_name,
-                                'file_path' => $file->file_path,
-                                'file_url' => $file->file_url
-                            ];
-                        })->toArray()
-                    ];
-                })->values()->toArray()
-            ]);
 
             return HelperFunc::sendResponse(201, 'Offer and answers submitted successfully', [
                 'offer' => [
@@ -1165,6 +1125,57 @@ class OfferQuestionController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
+        }
+    }
+
+    /**
+     * إرسال إيميل تعريفي لكل الشركات اللي مواصفاتها مناسبة للأوفر
+     * (نفس النوع + نفس الدولة + نفس المدينة + الشركة مش محظورة وموافقة)
+     */
+    private function notifyCompaniesNewOfferFromQuestions(Offer $offer): void
+    {
+        try {
+            if (!$offer->country_id || !$offer->city_id) {
+                return;
+            }
+
+            $companies = User::where('role', 'company')
+                ->where('ban', '0')
+                ->where('status', '1')
+                ->whereHas('companyDetails', function ($query) {
+                    $query->where('sucsses', '1');
+                })
+                ->whereHas('typesComapny', function ($query) use ($offer) {
+                    $query->where('type_id', $offer->type_id);
+                })
+                ->whereHas('countries', function ($query) use ($offer) {
+                    $query->where('country_id', $offer->country_id);
+                })
+                ->whereHas('cities', function ($query) use ($offer) {
+                    $query->where('city_id', $offer->city_id);
+                })
+                ->get();
+
+            if ($companies->isEmpty()) {
+                return;
+            }
+
+            $price = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers ?: 1));
+
+            foreach ($companies as $company) {
+                try {
+                    // هنا بنستفيد من الـ Mailable اللي فيه Multi-language
+                    Mail::to($company->email)->send(new \App\Mail\NewOfferForCompany($offer, $company, $price));
+                } catch (\Exception $e) {
+                    Log::error('Error sending company intro email', [
+                        'company_id' => $company->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    continue;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Error in notifyCompaniesNewOfferFromQuestions', ['error' => $e->getMessage()]);
         }
     }
 
