@@ -122,14 +122,16 @@ class OfferQuestionController extends Controller
             return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors());
         }
 
-        // حفظ الإجابة
+        // حفظ الإجابة (نفس فلتر Besonderheiten لأسئلة النوع text)
+        $answerValue = $this->filterTextQuestionAnswer($question, $request->answer ?? null);
+
         $answer = OfferAnswer::updateOrCreate(
             [
                 'offer_id' => $offer_id,
                 'question_id' => $question->id
             ],
             [
-                'answer_text' => $request->answer ?? null,
+                'answer_text' => $answerValue,
             ]
         );
 
@@ -299,9 +301,13 @@ class OfferQuestionController extends Controller
         }
 
         $offer = Offer::findOrFail($offer_id);
-        $answer = OfferAnswer::where('offer_id', $offer_id)->findOrFail($answer_id);
+        $answer = OfferAnswer::where('offer_id', $offer_id)
+            ->with('question')
+            ->findOrFail($answer_id);
 
-        $answer->answer_text = $request->answer ?? $answer->answer_text;
+        if ($request->has('answer')) {
+            $answer->answer_text = $this->filterTextQuestionAnswer($answer->question, $request->answer);
+        }
         $answer->save();
 
         if ($request->has('option_ids')) {
@@ -868,6 +874,8 @@ class OfferQuestionController extends Controller
                     ]);
                 }
 
+                $answerText = $this->filterTextQuestionAnswer($question, $answerText);
+
                 Log::info('=== Processing Answer ===', [
                     'question_id' => $question->id,
                     'question_text' => $question->getTranslation('question_text', 'en'),
@@ -1167,70 +1175,83 @@ class OfferQuestionController extends Controller
         return preg_replace($patterns, '*****', $besonderheiten);
     }
 
-    private function bayOffer($offer_id)
+    /**
+     * يطبّق نفس فلتر Besonderheiten على نص إجابة السؤال إذا كان نوعه text فقط (لا يُستخدم لـ email/phone/اختيارات).
+     */
+    private function filterTextQuestionAnswer(TypeQuestion $question, ?string $answerText): ?string
     {
-        try {
-            $offer = Offer::with(['type', 'country', 'city'])->find($offer_id);
-
-            if (!$offer || !$offer->type) {
-                return;
-            }
-
-            // Check if offer has country and city
-            if (!$offer->country_id || !$offer->city_id) {
-                return; // Skip if offer doesn't have location
-            }
-
-            $today = now()->format('Y-m-d');
-
-            $companies = User::where('role', 'company')
-                ->where('ban', '0')
-                ->where('status', '1')
-                ->whereHas('companyDetails', function ($query) {
-                    $query->where('sucsses', '1');
-                })
-                ->whereHas('typesComapny', function ($query) use ($offer) {
-                    $query->where('type_id', $offer->type_id);
-                })
-                ->whereHas('countries', function ($query) use ($offer) {
-                    $query->where('country_id', $offer->country_id);
-                })
-                ->whereHas('cities', function ($query) use ($offer) {
-                    $query->where('city_id', $offer->city_id);
-                })
-                ->withCount([
-                    'shopping_list as shopping_list_count' => function ($query) use ($today) {
-                        $query->where('type', 'D')
-                            ->whereDate('created_at', $today);
-                    },
-                ])
-                ->get();
-
-            $companies->each(function ($company) {
-                $company->shopping_list_count = $company->shopping_list_count ?? 0;
-            });
-
-            $filteredCompanies = $companies->filter(function ($company) use ($offer) {
-                $amountTotal = $company->wallet->amount ?? 0;
-                $expenseTotal = $company->wallet->expense ?? 0;
-                $totalMoneyInWallet = $amountTotal - $expenseTotal;
-
-                $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
-
-                return $totalMoneyInWallet >= $offerPrice;
-            });
-
-            $sortedCompanies = $filteredCompanies->sortBy('shopping_list_count');
-
-            foreach ($sortedCompanies as $company) {
-                Shopping_list::create([
-                    'offer_id' => $offer->id,
-                    'user_id' => $company->id,
-                    'type' => 'D',
-                ]);
-            }
-        } catch (\Exception $e) {
-            // تجاهل الأخطاء في bayOffer
+        if ($question->question_type !== 'text') {
+            return $answerText;
         }
+
+        return $this->filterBesonderheiten($answerText);
     }
+
+    // private function bayOffer($offer_id)
+    // {
+    //     try {
+    //         $offer = Offer::with(['type', 'country', 'city'])->find($offer_id);
+
+    //         if (!$offer || !$offer->type) {
+    //             return;
+    //         }
+
+    //         // Check if offer has country and city
+    //         if (!$offer->country_id || !$offer->city_id) {
+    //             return; // Skip if offer doesn't have location
+    //         }
+
+    //         $today = now()->format('Y-m-d');
+
+    //         $companies = User::where('role', 'company')
+    //             ->where('ban', '0')
+    //             ->where('status', '1')
+    //             ->whereHas('companyDetails', function ($query) {
+    //                 $query->where('sucsses', '1');
+    //             })
+    //             ->whereHas('typesComapny', function ($query) use ($offer) {
+    //                 $query->where('type_id', $offer->type_id);
+    //             })
+    //             ->whereHas('countries', function ($query) use ($offer) {
+    //                 $query->where('country_id', $offer->country_id);
+    //             })
+    //             ->whereHas('cities', function ($query) use ($offer) {
+    //                 $query->where('city_id', $offer->city_id);
+    //             })
+    //             ->withCount([
+    //                 'shopping_list as shopping_list_count' => function ($query) use ($today) {
+    //                     $query->where('type', 'D')
+    //                         ->whereDate('created_at', $today);
+    //                 },
+    //             ])
+    //             ->get();
+
+    //         $companies->each(function ($company) {
+    //             $company->shopping_list_count = $company->shopping_list_count ?? 0;
+    //         });
+
+    //         $filteredCompanies = $companies->filter(function ($company) use ($offer) {
+    //             $amountTotal = $company->wallet->amount ?? 0;
+    //             $expenseTotal = $company->wallet->expense ?? 0;
+    //             $totalMoneyInWallet = $amountTotal - $expenseTotal;
+
+    //             $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
+
+    //             return $totalMoneyInWallet >= $offerPrice;
+    //         });
+
+    //         $sortedCompanies = $filteredCompanies->sortBy('shopping_list_count');
+
+    //         foreach ($sortedCompanies as $company) {
+    //             Shopping_list::create([
+    //                 'offer_id' => $offer->id,
+    //                 'user_id' => $company->id,
+    //                 'type' => 'D',
+    //             ]);
+    //         }
+    //     } catch (\Exception $e) {
+    //         // تجاهل الأخطاء في bayOffer
+    //         Log::error('Error in bayOffer: ' . $e->getMessage());
+    //     }
+    // }
 }
