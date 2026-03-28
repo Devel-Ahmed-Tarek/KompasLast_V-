@@ -373,11 +373,13 @@ class HomePageController extends Controller
                 try {
                     Mail::to($company->email)->send(new NewOfferForCompany($offer, $company, $price));
                 } catch (\Exception $e) {
+                    Log::error('Error sending email to company: ' . $e->getMessage());
                     // تجاهل خطأ شركة واحدة ونكمل لباقي الشركات
                     continue;
                 }
             }
         } catch (\Exception $e) {
+            Log::error('Error sending email to companies: ' . $e->getMessage());
             // لو حصل أي خطأ عام، ما نكسرش عملية التأكيد
         }
     }

@@ -1052,20 +1052,9 @@ class OfferQuestionController extends Controller
 
             // إرسال إيميل تعريفي للأدمن عن الأوفر الجديد (يروح على إيميل info)
             try {
-                $adminEmail = config('mail.admin_info', 'info@auftragkompass.com');
-                if ($adminEmail) {
-                    Mail::to($adminEmail)->send(new AdminNewOffer($offer));
-                }
+                Mail::to('info@auftagkompass.de')->send(new AdminNewOffer($offer));
             } catch (\Exception $e) {
                 Log::error('Error sending admin email', ['error' => $e->getMessage()]);
-                // تجاهل أي خطأ في إيميل الأدمن
-            }
-
-            // إرسال إيميل تعريفي للشركات المناسبة (نفس النوع + نفس الدولة + نفس المدينة + مش محظورة)
-            try {
-                $this->notifyCompaniesNewOfferFromQuestions($offer);
-            } catch (\Exception $e) {
-                Log::error('Error sending company intro emails', ['error' => $e->getMessage()]);
             }
 
             // إرسال إشعار للـ Admins داخل السيستم
@@ -1125,57 +1114,6 @@ class OfferQuestionController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
-        }
-    }
-
-    /**
-     * إرسال إيميل تعريفي لكل الشركات اللي مواصفاتها مناسبة للأوفر
-     * (نفس النوع + نفس الدولة + نفس المدينة + الشركة مش محظورة وموافقة)
-     */
-    private function notifyCompaniesNewOfferFromQuestions(Offer $offer): void
-    {
-        try {
-            if (!$offer->country_id || !$offer->city_id) {
-                return;
-            }
-
-            $companies = User::where('role', 'company')
-                ->where('ban', '0')
-                ->where('status', '1')
-                ->whereHas('companyDetails', function ($query) {
-                    $query->where('sucsses', '1');
-                })
-                ->whereHas('typesComapny', function ($query) use ($offer) {
-                    $query->where('type_id', $offer->type_id);
-                })
-                ->whereHas('countries', function ($query) use ($offer) {
-                    $query->where('country_id', $offer->country_id);
-                })
-                ->whereHas('cities', function ($query) use ($offer) {
-                    $query->where('city_id', $offer->city_id);
-                })
-                ->get();
-
-            if ($companies->isEmpty()) {
-                return;
-            }
-
-            $price = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers ?: 1));
-
-            foreach ($companies as $company) {
-                try {
-                    // هنا بنستفيد من الـ Mailable اللي فيه Multi-language
-                    Mail::to($company->email)->send(new \App\Mail\NewOfferForCompany($offer, $company, $price));
-                } catch (\Exception $e) {
-                    Log::error('Error sending company intro email', [
-                        'company_id' => $company->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                    continue;
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Error in notifyCompaniesNewOfferFromQuestions', ['error' => $e->getMessage()]);
         }
     }
 
