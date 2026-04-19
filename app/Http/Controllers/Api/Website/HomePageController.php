@@ -303,6 +303,7 @@ class HomePageController extends Controller
     public function confirmOffer($token)
     {
         $offer = Offer::where('confirm_token', $token)->first();
+        $config = ConfigApp::first();
 
         if (! $offer || $offer->confirm_status === 'confirmed') {
             // لو الأوفر مش موجود أو متأكد قبل كده نرجعه برضه لصفحة الـ frontend
@@ -319,8 +320,11 @@ class HomePageController extends Controller
             // إرسال إيميل إشعار لكل الشركات المناسبة أن هناك أوفر جديد في الشوب
             $this->notifyCompaniesNewOffer($offer);
 
-            // المنطق القديم للـ Dynamic Buy (لو مفعّل بالإعدادات)
-            $this->bayOffer($offer->id);
+        
+            if($config->offer_flow == 0) {
+                // المنطق القديم للـ Dynamic Buy (لو مفعّل بالإعدادات)
+                $this->bayOffer($offer->id);
+            }
 
             DB::commit();
             // بعد نجاح التأكيد نرجع المستخدم لصفحة التأكيد في الـ Frontend
