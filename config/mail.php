@@ -124,4 +124,15 @@ return [
 
     'admin_info' => env('MAIL_ADMIN_INFO', 'info@auftragkompass.com'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Support Email
+    |--------------------------------------------------------------------------
+    |
+    | Email address that receives complaint / support notifications.
+    |
+    */
+
+    'support_info' => env('MAIL_SUPPORT_INFO', 'support@auftragkompass.com'),
+
 ];

@@ -25,7 +25,7 @@
                             <strong>{{ __('offer_purchased_admin.date') }}:</strong> {{ now()->format('d.m.Y H:i') }}
                         </p>
                         <p>
-                            {{ __('offer_purchased_admin.info_note', ['email' => 'info@auftagkompass.de']) }}
+                            {{ __('offer_purchased_admin.info_note', ['email' => config('mail.admin_info', 'info@auftragkompass.com')]) }}
                         </p>
                         <p style="margin-top:30px;">
                             {{ __('offer_purchased_admin.regards') }}<br>

@@ -1060,7 +1060,8 @@ class OfferQuestionController extends Controller
 
             // إرسال إيميل تعريفي للأدمن عن الأوفر الجديد (يروح على إيميل info)
             try {
-                Mail::to('info@auftagkompass.de')->send(new AdminNewOffer($offer));
+                $adminEmail = config('mail.admin_info', 'info@auftragkompass.com');
+                Mail::to($adminEmail)->send(new AdminNewOffer($offer));
             } catch (\Exception $e) {
                 Log::error('Error sending admin email', ['error' => $e->getMessage()]);
             }

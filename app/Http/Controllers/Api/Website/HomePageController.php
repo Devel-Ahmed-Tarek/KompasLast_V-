@@ -22,6 +22,7 @@ use App\Notifications\PaymentNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -105,7 +106,6 @@ class HomePageController extends Controller
 
         $config = ConfigApp::first();
 
-        return $config;
         if ($config->offer_flow == 1) {
             $status = false;
         }
@@ -228,9 +228,9 @@ class HomePageController extends Controller
             }
 
             $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
-            HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offer->id, [
-                'en' => 'A new offer "' . $offer->name,
-                'de' => 'Ein neues Angebot "' . $offer->name,
+            HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offerModel->id, [
+                'en' => 'A new offer "' . $offerModel->name . '" has been created',
+                'de' => 'Ein neues Angebot "' . $offerModel->name . '" wurde erstellt',
             ]);
             return HelperFunc::sendResponse(201, 'Offer created successfully. Please confirm your offer from the email.', $offerModel ?? $data);
         } catch (\Exception $e) {
@@ -306,7 +306,7 @@ class HomePageController extends Controller
         $config = ConfigApp::first();
 
         if (! $offer || $offer->confirm_status === 'confirmed') {
-            // لو الأوفر مش موجود أو متأكد قبل كده نرجعه برضه لصفحة الـ frontend
+            // لو الأوفر مش موجود أو متأكد قبل كده نرجع نفس الرسالة
             return HelperFunc::sendResponse('200', 'success', []);
         }
 
@@ -317,17 +317,17 @@ class HomePageController extends Controller
             $offer->confirmed_at   = now();
             $offer->save();
 
-            // إرسال إيميل إشعار لكل الشركات المناسبة أن هناك أوفر جديد في الشوب
-            $this->notifyCompaniesNewOffer($offer);
-
-        
-            if($config->offer_flow == 0) {
-                // المنطق القديم للـ Dynamic Buy (لو مفعّل بالإعدادات)
-                $this->bayOffer($offer->id);
+            // لو الأدمن مفعّل الحجب → الأوفر يفضل status=false ومفيش إيميلات
+            // الأدمن لازم يعمل Activate يدوياً عشان الإيميلات تتبعت
+            if ($config && $config->offer_flow == 1) {
+                DB::commit();
+                return HelperFunc::sendResponse('200', 'success', []);
             }
 
+            // الأدمن مش حاجب → نوزع الأوفر فوراً
+            $this->processOfferDistribution($offer);
+
             DB::commit();
-            // بعد نجاح التأكيد نرجع المستخدم لصفحة التأكيد في الـ Frontend
             return HelperFunc::sendResponse('200', 'success', []);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -336,154 +336,166 @@ class HomePageController extends Controller
     }
 
     /**
-     * إرسال إيميل لكل الشركات اللي مواصفاتها مناسبة للأوفر
-     * بدون شراء، فقط إشعار بوجود أوفر جديد في الشوب
+     * نسخة public من processOfferDistribution لاستدعائها من Controllers تانية
+     * (مثل AdminOfferController عند Activate الأوفر)
      */
-    private function notifyCompaniesNewOffer(Offer $offer): void
+    public function processOfferDistributionPublic(Offer $offer): void
+    {
+        $this->processOfferDistribution($offer);
+    }
+
+    /**
+     * توزيع الأوفر على الشركات المطابقة بمنطق موحد:
+     * 1) لو accept_dynamic_offer مفعّل → الشركات اللي عندها status=1 ورصيد كافٍ تشتري تلقائياً
+     * 2) الباقيين (شراء تلقائي معطّل أو رصيد ناقص) ياخدوا إشعار وجود أوفر جديد في الشوب
+     */
+    private function processOfferDistribution(Offer $offer): void
     {
         try {
+            $config = ConfigApp::first();
+
             // لازم يكون للأوفر دولة ومدينة عشان نطابق على اشتراك الشركات
-            if (!$offer->country_id || !$offer->city_id) {
+            if (! $offer->country_id || ! $offer->city_id) {
                 return;
             }
 
-            $companies = User::where('role', 'company')
+            $offer->loadMissing('type');
+
+            // 1) جلب كل الشركات المطابقة (نوع + دولة + مدينة + موافقة + غير محظورة)
+            //    هنا مش بنفلتر على status لأنه دلالة الشراء التلقائي
+            $matchingCompanies = User::where('role', 'company')
                 ->where('ban', '0')
-                ->where('status', '1')
-                ->whereHas('companyDetails', function ($query) {
-                    $query->where('sucsses', '1');
+                ->whereHas('companyDetails', function ($q) {
+                    $q->where('sucsses', '1');
                 })
-                // نفس نوع الخدمة
-                ->whereHas('typesComapny', function ($query) use ($offer) {
-                    $query->where('type_id', $offer->type_id);
+                ->whereHas('typesComapny', function ($q) use ($offer) {
+                    $q->where('type_id', $offer->type_id);
                 })
-                // مشترك في نفس الدولة
-                ->whereHas('countries', function ($query) use ($offer) {
-                    $query->where('country_id', $offer->country_id);
+                ->whereHas('countries', function ($q) use ($offer) {
+                    $q->where('country_id', $offer->country_id);
                 })
-                // ومشترك في نفس المدينة
-                ->whereHas('cities', function ($query) use ($offer) {
-                    $query->where('city_id', $offer->city_id);
+                ->whereHas('cities', function ($q) use ($offer) {
+                    $q->where('city_id', $offer->city_id);
                 })
+                ->with('wallet')
                 ->get();
 
-            if ($companies->isEmpty()) {
+            if ($matchingCompanies->isEmpty()) {
                 return;
             }
 
-            $price = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers ?: 1));
+            $offerPrice = $offer->unit_price
+                ?? (optional($offer->type)->price / max(1, $offer->Number_of_offers ?: 1));
 
-            foreach ($companies as $company) {
-                try {
-                    Mail::to($company->email)->send(new NewOfferForCompany($offer, $company, $price));
-                } catch (\Exception $e) {
-                    Log::error('Error sending email to company: ' . $e->getMessage());
-                    // تجاهل خطأ شركة واحدة ونكمل لباقي الشركات
-                    continue;
+            $purchasedCompanyIds = [];
+            $adminEmail          = config('mail.admin_info', 'info@auftragkompass.com');
+
+            // 2) الشراء التلقائي (لو مفعّل عالمياً) للشركات اللي status=1 ورصيدها كافٍ
+            if ($config && $config->accept_dynamic_offer == 1) {
+                $today = now()->format('Y-m-d');
+
+                $autoBuyCompanies = $matchingCompanies
+                    ->where('status', 1)
+                    ->sortBy(function ($c) use ($today) {
+                        return $c->shopping_list()
+                            ->whereDate('created_at', $today)
+                            ->where('type', 'D')
+                            ->count();
+                    });
+
+                foreach ($autoBuyCompanies as $company) {
+                    $offer->refresh();
+                    if ($offer->count <= 0) {
+                        break;
+                    }
+
+                    $walletAmount  = $company->wallet->amount ?? 0;
+                    $walletExpense = $company->wallet->expense ?? 0;
+                    $available     = $walletAmount - $walletExpense;
+
+                    if ($available < $offerPrice) {
+                        continue;
+                    }
+
+                    try {
+                        // تنفيذ عملية الشراء
+                        Shopping_list::create([
+                            'offer_id' => $offer->id,
+                            'user_id'  => $company->id,
+                            'type'     => 'D',
+                        ]);
+
+                        $offer->decrement('count');
+
+                        $company->wallet()->updateOrCreate(
+                            ['user_id' => $company->id],
+                            ['expense' => $walletExpense + $offerPrice]
+                        );
+
+                        // إشعار داخل التطبيق للشركة
+                        $company->notify(new PaymentNotification([
+                            'type'     => 'offer',
+                            'offer_id' => $offer->id,
+                            'mgs'      => [
+                                'en' => 'You have a new offer with: ' . $offerPrice . ' CHF',
+                                'de' => 'Sie haben ein neues Angebot mit: ' . $offerPrice . ' CHF',
+                                'it' => 'Hai una nuova offerta con: ' . $offerPrice . ' CHF',
+                                'fr' => 'Vous avez une nouvelle offre avec: ' . $offerPrice . ' CHF',
+                            ],
+                            'serves'   => optional($offer->type)->getTranslations('name'),
+                        ]));
+
+                        // إشعار داخلي للأدمنز
+                        $admins = User::query()
+                            ->where('role', 'admin')
+                            ->where('available_notification', '1')
+                            ->get();
+                        HelperFunc::sendMultilangNotification($admins, 'offer_purchased', $offer->id, [
+                            'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . $offerPrice . ' CHF.',
+                            'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . $offerPrice . ' CHF gekauft.',
+                        ]);
+
+                        // إيميلات الشراء
+                        Mail::to($company->email)->send(new OfferPurchasedCompany($offer, $company, $offerPrice));
+                        if ($adminEmail) {
+                            Mail::to($adminEmail)->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
+                        }
+
+                        $purchasedCompanyIds[] = $company->id;
+                    } catch (\Exception $e) {
+                        Log::error('Auto-buy failed for company', [
+                            'company_id' => $company->id,
+                            'offer_id'   => $offer->id,
+                            'error'      => $e->getMessage(),
+                        ]);
+                        continue;
+                    }
+                }
+            }
+
+            // 3) الشركات الباقية (مش مفعّلة شراء تلقائي، أو رصيدها مش كافي، أو الأدمن أوقف الشراء التلقائي)
+            //    تاخد إيميل وجود أوفر جديد في الشوب — بشرط إن لسة فيه count
+            if ($offer->count > 0) {
+                $remainingCompanies = $matchingCompanies->whereNotIn('id', $purchasedCompanyIds);
+
+                foreach ($remainingCompanies as $company) {
+                    try {
+                        Mail::to($company->email)->send(new NewOfferForCompany($offer, $company, $offerPrice));
+                    } catch (\Exception $e) {
+                        Log::error('Error sending NewOfferForCompany', [
+                            'company_id' => $company->id,
+                            'offer_id'   => $offer->id,
+                            'error'      => $e->getMessage(),
+                        ]);
+                        continue;
+                    }
                 }
             }
         } catch (\Exception $e) {
-            Log::error('Error sending email to companies: ' . $e->getMessage());
-            // لو حصل أي خطأ عام، ما نكسرش عملية التأكيد
-        }
-    }
-
-    private function bayOffer($offer_id)
-    {
-
-        $offer = Offer::find($offer_id);
-
-        if (! $offer) {
-            // يمكنك إرسال رسالة خطأ مفيدة هنا أو تجاهل العملية
-            return HelperFunc::sendResponse(404, 'Offer not found');
-        }
-
-        $today = now()->format('Y-m-d');
-
-        $companies = User::where('role', 'company')
-            ->where('ban', '0')
-            ->where('status', '1')
-            ->whereHas('companyDetails', function ($query) {
-                $query->where('sucsses', '1');
-            })
-            ->whereHas('typesComapny', function ($query) use ($offer) {
-                $query->where('type_id', $offer->type_id);
-            })
-            ->withCount([
-                'shopping_list as shopping_list_count' => function ($query) use ($today) {
-                    $query->where('type', 'D')
-                        ->whereDate('created_at', $today);
-                },
-            ])
-            ->get();
-
-        $companies->each(function ($company) {
-            $company->shopping_list_count = $company->shopping_list_count ?? 0;
-        });
-
-        $filteredCompanies = $companies->filter(function ($company) use ($offer) {
-            $amountTotal        = $company->wallet->amount ?? 0;
-            $expenseTotal       = $company->wallet->expense ?? 0;
-            $totalMoneyInWallet = $amountTotal - $expenseTotal;
-
-            $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
-
-            return $totalMoneyInWallet >= $offerPrice;
-        });
-
-        $sortedCompanies = $filteredCompanies->sortBy('shopping_list_count');
-
-        foreach ($sortedCompanies as $company) {
-
-            Shopping_list::create([
-                'offer_id' => $offer->id,
-                'user_id'  => $company->id,
-                'type'     => 'D', // نوع الشراء
+            Log::error('Error in processOfferDistribution', [
+                'offer_id' => $offer->id ?? null,
+                'error'    => $e->getMessage(),
             ]);
-
-            // إرسال إشعار للدفع (داخل التطبيق)
-            $data = [
-                'type'     => 'offer',
-                'offer_id' => $offer->id,
-                'mgs'      => [
-                    'en' => 'You have a new offer with: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
-                    'de' => 'Sie haben ein neues Angebot mit: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
-                    'it' => 'Hai una nuova offerta con: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
-                    'fr' => 'Vous avez une nouvelle offre avec: ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF',
-                ],
-                'serves'   => $offer->type->getTranslations('name'),
-            ];
-            $company->notify(new PaymentNotification($data));
-
-            $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
-            HelperFunc::sendMultilangNotification($admins, 'offer_purchased', $offer->id, [
-                'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF.',
-                'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers))) . ' CHF gekauft.',
-            ]);
-            $this->sendMailtocompanyDataOfOffer($company, $offer);
-            // تحديث عدد العروض المتاحة
-            $offer->decrement('count');
-
-            // تحديث محفظة المستخدم
-            $company->wallet()->updateOrCreate(
-                [],
-                ['expense' => $company->wallet->expense + ($offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers)))]
-            );
-
-            // إرسال بريد إلكتروني للشركة + بريد إلى info@
-            try {
-                $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
-                Mail::to($company->email)->send(new OfferPurchasedCompany($offer, $company, $offerPrice));
-                Mail::to('info@auftagkompass.de')->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
-            } catch (\Exception $e) {
-                // تجاهل أخطاء الإرسال
-            }
         }
-    }
-
-    private function sendMailtocompanyDataOfOffer($user, $offer)
-    {
-        $locale = $user->lang ?? 'en';
-        Mail::to($user->email)->send(new OfferSelling($offer));
     }
 }

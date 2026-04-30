@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Website\HomePageController;
 use App\Http\Resources\OfferWithAnswersResource;
 use App\Models\ConfigApp;
 use App\Models\Offer;
 use App\Models\Type;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Location;
 
@@ -290,10 +292,26 @@ class AdminOfferController extends Controller
 
     public function updateStatus($id, $status)
     {
+        $offer     = Offer::findOrFail($id);
+        $oldStatus = (int) $offer->status;
+        $newStatus = (int) $status;
 
-        $offer         = Offer::findOrFail($id);
-        $offer->status = $status;
+        $offer->status = $newStatus;
         $offer->save();
+
+        // لو الأدمن فعّل الأوفر للمرة الأولى وكان الأوفر مؤكَّد من العميل
+        // نوزع الإيميلات (شراء تلقائي + إشعار شوب) باستخدام نفس منطق التأكيد
+        if ($newStatus === 1 && $oldStatus !== 1 && $offer->confirm_status === 'confirmed') {
+            try {
+                app(HomePageController::class)->processOfferDistributionPublic($offer);
+            } catch (\Exception $e) {
+                Log::error('Error distributing offer after admin activation', [
+                    'offer_id' => $offer->id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+        }
+
         return HelperFunc::sendResponse(200, __('Status updated successfully'), []);
     }
 }

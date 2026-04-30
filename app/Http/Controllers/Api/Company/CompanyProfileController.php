@@ -16,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use function PHPSTORM_META\type;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
@@ -161,16 +162,16 @@ class CompanyProfileController extends Controller
             return response()->json(['message' => 'Invalid status value'], 400);
         }
 
-        // Update company status
+        // Update company status (1 = شراء تلقائي مفعّل، 0 = إشعارات شوب فقط)
         $company->status = $status;
         $company->save();
 
         // Get app config
         $config = ConfigApp::first();
 
-        // If active or dynamic offer is off, run offer purchase logic
-        if ($company->status == 1 || $config->accept_dynamic_offer == 0) {
-            $this->bayOfferCompany();
+        // الشراء التلقائي يشتغل بس لو الشركة فعّلته **و** الأدمن مفعّله عالمياً
+        if ((int) $company->status === 1 && $config && (int) $config->accept_dynamic_offer === 1) {
+            $this->buyAvailableOffersForCompany($company);
         }
 
         // Get all admins with notifications enabled
@@ -194,101 +195,141 @@ class CompanyProfileController extends Controller
         return HelperFunc::sendResponse(200, 'Company status updated successfully', []);
     }
 
-    private function bayOfferCompany()
+    /**
+     * شراء كل الأوفرات المتاحة في الشوب اللي تنفع للشركة دلوقتي
+     * يُستدعى لما الشركة تفعّل الشراء التلقائي (status=1) والأدمن مفعّله عالمياً
+     */
+    private function buyAvailableOffersForCompany($company): void
     {
-        $today = now()->format('Y-m-d'); // Get today's date in Y-m-d format
-        $now   = now();                  // Get the current timestamp
-
-        // Fetch offers that:
-        // - are scheduled for 1 day before today
-        // - are before the current time
-        // - still have available quantity
-        $offers = Offer::whereRaw('DATE_SUB(date, INTERVAL 1 DAY) = ?', [$today])
-            ->where('date', '<', $now)
-            ->where('count', '!=', 0)
-            ->get();
-
-        // Get the currently authenticated company
-        $company = Auth::user();
-
-        if (! $company || ! $company->wallet) {
-            return; // No authenticated user or wallet associated
-        }
-
-        // Calculate the available balance in the company's wallet
-        $amountTotal        = $company->wallet->amount;
-        $expenseTotal       = $company->wallet->expense;
-        $totalMoneyInWallet = $amountTotal - $expenseTotal;
-
-        foreach ($offers as $offer) {
-            // Check if the offer was already purchased by the company
-            $alreadyPurchased = Shopping_list::where('user_id', $company->id)
-                ->where('offer_id', $offer->id)
-                ->exists();
-
-            if ($alreadyPurchased) {
-                continue; // Skip if already purchased
+        try {
+            if (! $company || ! $company->wallet) {
+                return;
             }
 
-            // Calculate offer price per company (frozen on the offer if available)
-            $offerPrice = $offer->unit_price ?? ($offer->type->price / max(1, $offer->Number_of_offers));
+            // 1) الأوفرات اللي تنفع: مؤكدة + مفعّلة + لسة فيها count + تاريخها مازال في المستقبل
+            //    + نفس نوع/دولة/مدينة الشركة + الشركة لم تشتريها قبل كده
+            $companyTypeIds    = $company->typesComapny()->pluck('types.id')->toArray();
+            $companyCountryIds = $company->countries()->pluck('countries.id')->toArray();
+            $companyCityIds    = $company->cities()->pluck('cities.id')->toArray();
 
-            // Check if company has enough funds to purchase the offer
-            if ($totalMoneyInWallet >= $offerPrice) {
-                // Add offer to shopping list
-                Shopping_list::create([
-                    'offer_id' => $offer->id,
-                    'user_id'  => $company->id,
-                    'type'     => 'D',
-                ]);
+            if (empty($companyTypeIds) || empty($companyCountryIds) || empty($companyCityIds)) {
+                return;
+            }
 
-                // Decrease the offer quantity by 1
-                $offer->decrement('count');
+            $offers = Offer::where('confirm_status', 'confirmed')
+                ->where('status', true)
+                ->where('count', '>', 0)
+                ->where('date', '>=', now()->format('Y-m-d'))
+                ->whereIn('type_id', $companyTypeIds)
+                ->whereIn('country_id', $companyCountryIds)
+                ->whereIn('city_id', $companyCityIds)
+                ->whereDoesntHave('Shopping_list', function ($q) use ($company) {
+                    $q->where('user_id', $company->id);
+                })
+                ->orderBy('id', 'desc')
+                ->get();
 
-                // Prepare notification data
-                $data = [
-                    'type'     => 'offer',
-                    'offer_id' => $offer->id,
-                    'mgs'      => [
-                        'en' => 'You have a new offer with: ' . $offerPrice . ' CHF',
-                        'de' => 'Sie haben ein neues Angebot mit: ' . $offerPrice . ' CHF',
-                        'it' => 'Hai una nuova offerta con: ' . $offerPrice . ' CHF',
-                        'fr' => 'Vous avez une nouvelle offre avec: ' . $offerPrice . ' CHF',
-                    ],
-                    'serves'   => $offer->type->getTranslations('name'),
-                ];
+            if ($offers->isEmpty()) {
+                return;
+            }
 
-                // Notify the company (in-app)
-                $company->notify(new PaymentNotification($data));
+            // 2) حساب الرصيد المتاح في المحفظة
+            $walletAmount  = $company->wallet->amount ?? 0;
+            $walletExpense = $company->wallet->expense ?? 0;
+            $available     = $walletAmount - $walletExpense;
 
-                // Update the wallet expense for the company
-                $company->wallet()->updateOrCreate(
-                    ['user_id' => $company->id],
-                    ['expense' => $company->wallet->expense + $offerPrice]
-                );
+            $adminEmail = config('mail.admin_info', 'info@auftragkompass.com');
 
-                // Notify all admins about the offer purchase
-                $admins = User::query()
-                    ->where('role', 'admin')
-                    ->where("available_notification", '1')
-                    ->get();
+            foreach ($offers as $offer) {
+                $offer->loadMissing('type');
 
-                HelperFunc::sendMultilangNotification($admins, 'offer_purchased', $offer->id, [
-                    'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . $offerPrice . ' CHF.',
-                    'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . $offerPrice . ' CHF gekauft.',
-                ]);
+                $offerPrice = $offer->unit_price
+                    ?? (optional($offer->type)->price / max(1, $offer->Number_of_offers ?: 1));
 
-                // Deduct the offer price from the available wallet money
-                $totalMoneyInWallet -= $offerPrice;
+                if ($offerPrice <= 0) {
+                    continue;
+                }
+                if ($available < $offerPrice) {
+                    // الرصيد خلص → نوقف لباقي الأوفرات
+                    break;
+                }
 
-                // Send emails to company and info@
+                // refresh count عشان أوفر تاني ممكن خلص اتاحته خلال الشراء
+                $offer->refresh();
+                if ($offer->count <= 0) {
+                    continue;
+                }
+
                 try {
-                    Mail::to($company->email)->send(new OfferPurchasedCompany($offer, $company, $offerPrice));
-                    Mail::to('info@auftagkompass.de')->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
+                    // تنفيذ الشراء
+                    Shopping_list::create([
+                        'offer_id' => $offer->id,
+                        'user_id'  => $company->id,
+                        'type'     => 'D',
+                    ]);
+
+                    $offer->decrement('count');
+
+                    $company->wallet()->updateOrCreate(
+                        ['user_id' => $company->id],
+                        ['expense' => $walletExpense + $offerPrice]
+                    );
+
+                    // تحديث المتغيرات المحلية
+                    $available     -= $offerPrice;
+                    $walletExpense += $offerPrice;
+
+                    // إشعار داخل التطبيق للشركة
+                    $company->notify(new PaymentNotification([
+                        'type'     => 'offer',
+                        'offer_id' => $offer->id,
+                        'mgs'      => [
+                            'en' => 'You have a new offer with: ' . $offerPrice . ' CHF',
+                            'de' => 'Sie haben ein neues Angebot mit: ' . $offerPrice . ' CHF',
+                            'it' => 'Hai una nuova offerta con: ' . $offerPrice . ' CHF',
+                            'fr' => 'Vous avez une nouvelle offre avec: ' . $offerPrice . ' CHF',
+                        ],
+                        'serves'   => optional($offer->type)->getTranslations('name'),
+                    ]));
+
+                    // إشعار داخلي للأدمنز
+                    $admins = User::query()
+                        ->where('role', 'admin')
+                        ->where('available_notification', '1')
+                        ->get();
+
+                    HelperFunc::sendMultilangNotification($admins, 'offer_purchased', $offer->id, [
+                        'en' => 'The offer "' . $offer->name . '" has been purchased by the company "' . $company->name . '" for ' . $offerPrice . ' CHF.',
+                        'de' => 'Das Angebot "' . $offer->name . '" wurde von der Firma "' . $company->name . '" für ' . $offerPrice . ' CHF gekauft.',
+                    ]);
+
+                    // إيميلات الشراء (للشركة + لـ info)
+                    try {
+                        Mail::to($company->email)->send(new OfferPurchasedCompany($offer, $company, $offerPrice));
+                        if ($adminEmail) {
+                            Mail::to($adminEmail)->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Auto-buy mail error', [
+                            'company_id' => $company->id,
+                            'offer_id'   => $offer->id,
+                            'error'      => $e->getMessage(),
+                        ]);
+                    }
                 } catch (\Exception $e) {
-                    // ignore mail errors
+                    Log::error('Auto-buy purchase error', [
+                        'company_id' => $company->id,
+                        'offer_id'   => $offer->id,
+                        'error'      => $e->getMessage(),
+                    ]);
+                    continue;
                 }
             }
+        } catch (\Exception $e) {
+            Log::error('Error in buyAvailableOffersForCompany', [
+                'company_id' => $company->id ?? null,
+                'error'      => $e->getMessage(),
+            ]);
         }
     }
 

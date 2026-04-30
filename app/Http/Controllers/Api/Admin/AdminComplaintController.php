@@ -5,6 +5,7 @@ use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Models\Complaint;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
@@ -30,23 +31,28 @@ class AdminComplaintController extends Controller
         // Update status
         $complaint->update(['status' => $request->status]);
 
-                                        // Prepare data for emails
-        $userEmail = $complaint->email; // Email of the user
+        // Prepare data for emails
+        $userEmail    = $complaint->email; // Email of the user
+        $supportEmail = config('mail.support_info', 'support@auftragkompass.com');
+        $userLocale   = $complaint->lang ?? config('app.locale', 'en');
 
-        $supportEmail = 'support@compass.com'; // Support email address
+        try {
+            if ($request->status == 'approved') {
+                // Send email to support for approval
+                Mail::to($supportEmail)->send(new \App\Mail\SupportNotification($complaint, 'approved'));
+            } elseif ($request->status == 'rejected') {
+                // Send email to support for rejection
+                Mail::to($supportEmail)->send(new \App\Mail\SupportNotification($complaint, 'rejected'));
 
-        if ($request->status == 'approved') {
-
-            // Send email to support for approval
-            Mail::to($supportEmail)->send(new \App\Mail\SupportNotification($complaint, 'approved'));
-
-        } elseif ($request->status == 'rejected') {
-
-            // Send email to support for rejection
-            Mail::to($supportEmail)->send(new \App\Mail\SupportNotification($complaint, 'rejected'));
-
-            // Send apology email to the user
-            Mail::to($userEmail)->send(new \App\Mail\UserApology($complaint));
+                // Send apology email to the user (in user's language)
+                Mail::to($userEmail)->send(new \App\Mail\UserApology($complaint, $userLocale));
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed sending complaint status email', [
+                'complaint_id' => $complaint->id,
+                'status'       => $request->status,
+                'error'        => $e->getMessage(),
+            ]);
         }
 
         return HelperFunc::sendResponse(200, "Complaint status updated to {$request->status} successfully");
