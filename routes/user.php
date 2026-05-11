@@ -29,6 +29,7 @@ use Illuminate\Support\Str;
 Route::prefix('user')->group(function () {
 
     Route::get('home', [HomePageController::class, 'index']);
+    Route::get('check-config', [HomePageController::class, 'checkConfig']);
     Route::get('offers/confirm/{token}', [HomePageController::class, 'confirmOffer']);
     Route::get('aboutus', [AboutUsPageController::class, 'index']);
     Route::get('blogs', [BlogPageController::class, 'GetPageBlogs']);

@@ -498,4 +498,20 @@ class HomePageController extends Controller
             ]);
         }
     }
+
+    public function checkConfig(Request $request)
+    {
+        $config = ConfigApp::first();
+
+        if (! $config) {
+            return HelperFunc::sendResponse(404, 'Config not found', []);
+        }
+
+        $data = [
+            'add_offer'   => (int) $config->add_offer,
+            'add_company' => (int) $config->add_company,
+        ];
+
+        return HelperFunc::sendResponse(200, 'Config found', $data);
+    }
 }
