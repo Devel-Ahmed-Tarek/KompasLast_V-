@@ -167,12 +167,12 @@ class CompanyProfileController extends Controller
         $company->save();
 
         // Get app config
-        $config = ConfigApp::first();
+        // $config = ConfigApp::first();
 
-        // الشراء التلقائي يشتغل بس لو الشركة فعّلته **و** الأدمن مفعّله عالمياً
-        if ((int) $company->status === 1 && $config && (int) $config->accept_dynamic_offer === 1) {
-            $this->buyAvailableOffersForCompany($company);
-        }
+        // // الشراء التلقائي يشتغل بس لو الشركة فعّلته **و** الأدمن مفعّله عالمياً
+        // if ((int) $company->status === 1 && $config && (int) $config->accept_dynamic_offer === 1) {
+        //     $this->buyAvailableOffersForCompany($company);
+        // }
 
         // Get all admins with notifications enabled
         $admins = User::where("role", "admin")
