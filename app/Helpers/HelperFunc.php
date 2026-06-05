@@ -2,7 +2,9 @@
 
 namespace App\Helpers;
 
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 
 class HelperFunc
@@ -186,5 +188,20 @@ class HelperFunc
                 'de' => $messages['de'] ?? '',
             ],
         ]));
+    }
+
+    public static function notifySupervisor(Mailable $mailable): void
+    {
+        $email = config('mail.supervisor');
+
+        if (! $email) {
+            return;
+        }
+
+        try {
+            Mail::to($email)->send($mailable);
+        } catch (\Exception $e) {
+            Log::error('Supervisor email failed', ['error' => $e->getMessage()]);
+        }
     }
 }

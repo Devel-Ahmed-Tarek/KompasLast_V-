@@ -31,6 +31,8 @@ use App\Mail\OfferPurchasedCompany;
 use App\Mail\OfferPurchasedAdmin;
 use App\Mail\NewOfferForCompany;
 use App\Mail\AdminNewOffer;
+use App\Mail\SupervisorAutoPurchases;
+use App\Mail\SupervisorOfferConfirmed;
 
 class HomePageController extends Controller
 {
@@ -227,6 +229,10 @@ class HomePageController extends Controller
                 // لا نكسر الفلو لو إيميل الأدمن فشل
             }
 
+            if ($offerModel) {
+                HelperFunc::notifySupervisor(new AdminNewOffer($offerModel));
+            }
+
             $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
             HelperFunc::sendMultilangNotification($admins, "new_offer_created", $offerModel->id, [
                 'en' => 'A new offer "' . $offerModel->name . '" has been created',
@@ -317,6 +323,10 @@ class HomePageController extends Controller
             $offer->confirmed_at   = now();
             $offer->save();
 
+            $distributionRan = ! ($config && $config->offer_flow == 1);
+            $offer->loadMissing('type');
+            HelperFunc::notifySupervisor(new SupervisorOfferConfirmed($offer, $distributionRan));
+
             // لو الأدمن مفعّل الحجب → الأوفر يفضل status=false ومفيش إيميلات
             // الأدمن لازم يعمل Activate يدوياً عشان الإيميلات تتبعت
             if ($config && $config->offer_flow == 1) {
@@ -388,6 +398,7 @@ class HomePageController extends Controller
                 ?? (optional($offer->type)->price / max(1, $offer->Number_of_offers ?: 1));
 
             $purchasedCompanyIds = [];
+            $autoPurchases       = [];
             $adminEmail          = config('mail.admin_info', 'info@auftragkompass.com');
 
             // 2) الشراء التلقائي (لو مفعّل عالمياً) للشركات اللي status=1 ورصيدها كافٍ
@@ -462,6 +473,7 @@ class HomePageController extends Controller
                         }
 
                         $purchasedCompanyIds[] = $company->id;
+                        $autoPurchases[]       = ['company' => $company, 'price' => $offerPrice];
                     } catch (\Exception $e) {
                         Log::error('Auto-buy failed for company', [
                             'company_id' => $company->id,
@@ -470,6 +482,10 @@ class HomePageController extends Controller
                         ]);
                         continue;
                     }
+                }
+
+                if (! empty($autoPurchases)) {
+                    HelperFunc::notifySupervisor(new SupervisorAutoPurchases($offer, $autoPurchases));
                 }
             }
 

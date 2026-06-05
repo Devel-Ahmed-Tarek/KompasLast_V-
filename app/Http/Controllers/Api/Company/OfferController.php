@@ -254,6 +254,7 @@ class OfferController extends Controller
                 $adminEmail = config('mail.admin_info', 'info@auftragkompass.com');
                 Mail::to($user->email)->send(new OfferPurchasedCompany($offer, $user, $offerPrice));
                 Mail::to($adminEmail)->send(new OfferPurchasedAdmin($offer, $user, $offerPrice));
+                HelperFunc::notifySupervisor(new OfferPurchasedAdmin($offer, $user, $offerPrice));
             } catch (\Exception $e) {
                 // ignore mail transport errors
             }

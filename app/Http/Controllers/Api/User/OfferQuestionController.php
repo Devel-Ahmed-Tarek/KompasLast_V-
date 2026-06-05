@@ -1066,6 +1066,8 @@ class OfferQuestionController extends Controller
                 Log::error('Error sending admin email', ['error' => $e->getMessage()]);
             }
 
+            HelperFunc::notifySupervisor(new AdminNewOffer($offer));
+
             // إرسال إشعار للـ Admins داخل السيستم
             try {
                 $admins = User::where('role', 'admin')->where('available_notification', '1')->get();

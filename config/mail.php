@@ -126,6 +126,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Supervisor Email
+    |--------------------------------------------------------------------------
+    |
+    | External project owner / supervisor mailbox. Receives copies of key
+    | offer lifecycle events without affecting existing recipients.
+    |
+    */
+
+    'supervisor' => env('MAIL_SUPERVISOR_EMAIL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Support Email
     |--------------------------------------------------------------------------
     |

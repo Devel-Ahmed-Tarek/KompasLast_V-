@@ -309,6 +309,7 @@ class CompanyProfileController extends Controller
                         if ($adminEmail) {
                             Mail::to($adminEmail)->send(new OfferPurchasedAdmin($offer, $company, $offerPrice));
                         }
+                        HelperFunc::notifySupervisor(new OfferPurchasedAdmin($offer, $company, $offerPrice));
                     } catch (\Exception $e) {
                         Log::error('Auto-buy mail error', [
                             'company_id' => $company->id,
