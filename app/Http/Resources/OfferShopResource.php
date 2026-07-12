@@ -77,6 +77,20 @@ class OfferShopResource extends JsonResource
                 'price' => $this->unit_price ?? ($this->type->price / max(1, $this->Number_of_offers)),
             ],
             'id'               => $this->id,
+            'country_id'       => $this->country_id,
+            'city_id'          => $this->city_id,
+            'country'          => $this->when($this->countryRelation, function () use ($lang) {
+                return [
+                    'id'   => $this->countryRelation->id,
+                    'name' => $this->countryRelation->getTranslation('name', $lang),
+                ];
+            }),
+            'city'             => $this->when($this->cityRelation, function () use ($lang) {
+                return [
+                    'id'   => $this->cityRelation->id,
+                    'name' => $this->cityRelation->getTranslation('name', $lang),
+                ];
+            }),
             'date'             => $this->date,
             'Number_of_offers' => $this->Number_of_offers,
             'count'            => $this->count,

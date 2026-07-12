@@ -72,6 +72,8 @@ class OfferController extends Controller
             })
             ->with([
                 'type',
+                'countryRelation',
+                'cityRelation',
                 'answers' => function ($query) {
                     // تحميل فقط الإجابات للأسئلة التي show_before_purchase = true
                     $query->whereHas('question', function ($q) {
@@ -500,6 +502,8 @@ class OfferController extends Controller
             })
             ->with([
                 'offer.type',
+                'offer.countryRelation',
+                'offer.cityRelation',
                 'offer.answers' => function ($query) {
                     $query->whereHas('question', function ($q) {
                         $q->where('show_before_purchase', true);
