@@ -44,6 +44,10 @@ class OfferWithAnswersResource extends JsonResource
                 ];
             }),
             'completion_status' => $this->completion_status,
+            'status'            => $this->status,
+            'confirm_status'    => $this->confirm_status,
+            'confirmed_at'      => $this->confirmed_at,
+            'is_confirmed'      => $this->confirm_status === 'confirmed',
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,

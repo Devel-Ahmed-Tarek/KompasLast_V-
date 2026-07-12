@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Website\HomePageController;
+use App\Http\Resources\AdminOfferResource;
 use App\Http\Resources\OfferWithAnswersResource;
 use App\Models\ConfigApp;
 use App\Models\Offer;
@@ -27,9 +28,14 @@ class AdminOfferController extends Controller
 
             // Get the filter from the request
             $filterType = $request->input('filter'); // e.g., "24_hours", "purchased", "not_purchased"
+            $confirmStatus = $request->input('confirm_status'); // pending | confirmed
 
             // Start the query
             $query = Offer::with('type');
+
+            if (in_array($confirmStatus, ['pending', 'confirmed'], true)) {
+                $query->where('confirm_status', $confirmStatus);
+            }
 
             // Apply filters
             if ($filterType == '24_hours_to_filed') {
@@ -56,7 +62,7 @@ class AdminOfferController extends Controller
             $offers = $query->orderBy('id', 'desc')->paginate(10); // 10 offers per page
 
             // Return paginated offers using the helper
-            return HelperFunc::pagination($offers, $offers->items());
+            return HelperFunc::pagination($offers, AdminOfferResource::collection($offers));
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred while fetching the offers: ' . $e->getMessage(), []);
         }
