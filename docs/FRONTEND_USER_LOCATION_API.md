@@ -1,18 +1,28 @@
 # Frontend API — User (العميل / الموقع)
 
-توثيق الـ APIs المتعلقة بالموقع (دولة + مدينة) عند إنشاء عرض من الموقع.
+توثيق الـ APIs المتعلقة بالموقع عند إنشاء عرض.
 
 **Base:** `/api/user`  
 **Auth:** غير مطلوب لمعظم الـ endpoints دي
 
 ---
 
-## الفكرة للفرونت
+## الفكرة للفرونت (مهم)
 
-العميل يختار **دولة** ثم **مدينة** لموقع العرض — زي ما هو.
+العميل يقدر يحدد موقع العرض بـ **واحد من مسارين**:
 
-مفيش `radius_km` عند العميل.  
-النطاق يخص الشركة فقط (لو الشركة قريبة من مدينة العميل، العرض يوصلها).
+| المسار | إيه اللي بيتبعت | إيه اللي بيحصل |
+|--------|------------------|----------------|
+| **A — Select** | `country_id` + `city_id` | المدينة تتحفظ زي ما اختارها |
+| **B — GPS / إحداثيات** | `latitude` + `longitude` | النظام يلاقي **أقرب مدينة** في الداتا ويحط `country_id` + `city_id` أوتوماتيك |
+
+### قواعد إلزامية
+
+1. لو **مفيش** `latitude` و `longitude` → لازم `country_id` + `city_id` من الـ select
+2. لو بعت `latitude` لازم تبعت `longitude` معاها (والعكس)
+3. تقدر كمان تبعت **الاتنين معاً**: select + إحداثيات  
+   - المدينة من الـ select تُحفظ  
+   - الإحداثيات تُحفظ لتحسين التوزيع والشوب والبيع الديناميكي
 
 ---
 
@@ -21,10 +31,6 @@
 ```
 GET /api/user/countries?lang=de
 ```
-
-أو Header: `Accept-Language: de`
-
-**اللغات:** `en` | `ar` | `de` | `fr` | `it`
 
 ### Response
 ```json
@@ -58,23 +64,20 @@ GET /api/user/cities/by-country/{country_id}?lang=de
 }
 ```
 
-> ملاحظة: الـ response بيرجع `id` و `name` بس (مش lat/lng) — كفاية للـ select في الفورم.
-
 ---
 
-## 3) إنشاء عرض (موقع العرض)
+## 3) إنشاء عرض — حقول الموقع الجديدة
 
-عند إرسال العرض (فورم عادي أو questionnaire) لازم تبعت:
+عند إرسال العرض (فورم عادي أو questionnaire) أضف:
 
-| Field | Type | Required |
-|-------|------|----------|
-| `country_id` | number | نعم |
-| `city_id` | number | نعم |
-| باقي بيانات العرض | — | حسب الفورم |
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `country_id` | number | لو مفيش lat/lng | من الـ select |
+| `city_id` | number | لو مفيش lat/lng | لازم تبع نفس الدولة |
+| `latitude` | number | لو مفيش city select | `-90` … `90` |
+| `longitude` | number | لو مفيش city select | `-180` … `180` |
 
-**مهم:** `city_id` لازم تبع نفس `country_id`.
-
-### مثال
+### مثال A — Select فقط
 ```json
 {
   "type_id": 1,
@@ -87,32 +90,88 @@ GET /api/user/cities/by-country/{country_id}?lang=de
 }
 ```
 
-بعد الإرسال: العميل يستلم إيميل تأكيد → يضغط الرابط → العرض يتأكد.
+### مثال B — إحداثيات فقط (النظام يختار أقرب مدينة)
+```json
+{
+  "type_id": 1,
+  "latitude": 52.5200,
+  "longitude": 13.4050,
+  "name": "Max Mustermann",
+  "email": "max@example.com",
+  "phone": "+49123456789",
+  "lang": "de"
+}
+```
+
+### مثال C — Select + إحداثيات (أدق للتوزيع)
+```json
+{
+  "type_id": 1,
+  "country_id": 1,
+  "city_id": 5,
+  "latitude": 52.5100,
+  "longitude": 13.3900,
+  "name": "Max Mustermann",
+  "email": "max@example.com",
+  "phone": "+49123456789",
+  "lang": "de"
+}
+```
+
+### أخطاء محتملة (422)
+```json
+{
+  "location": ["country_id and city_id are required when coordinates are not provided."]
+}
+```
+```json
+{
+  "location": ["Both latitude and longitude are required together."]
+}
+```
+```json
+{
+  "location": ["No nearby city with coordinates was found."]
+}
+```
 
 ---
 
-## 4) تأكيد العرض
+## 4) UI مقترح للعميل
+
+**خيار 1 (كلاسيك):**  
+Select دولة → Select مدينة
+
+**خيار 2 (GPS):**  
+زر "استخدم موقعي الحالي" → المتصفح يديك `latitude` / `longitude` → تبعتهم بدون ما تختاره مدينة
+
+**خيار 3 (مختلط):**  
+Select مدينة + زر GPS يضيف الإحداثيات الدقيقة (أفضل للتوزيع على الشركات)
+
+---
+
+## 5) تأكيد العرض
 
 ```
 GET /api/user/offers/confirm/{token}
 ```
 
-عادةً بيجي من لينك الإيميل على الموقع:
-`https://auftragkompass.de/{lang}/confirm-offer/?token=...`
-
-الفرونت بياخد الـ `token` من الـ query ويضرب الـ API فوق.
+من لينك الإيميل — زي ما هو، مفيش تغيير.
 
 ---
 
 ## Checklist فرونت — User
 
-- [ ] Select دولة من `/countries`
-- [ ] بعد اختيار الدولة → تحميل مدنها من `/cities/by-country/{id}`
-- [ ] إرسال `country_id` + `city_id` مع فورم العرض
-- [ ] صفحة confirm-offer تقرأ `token` وتستدعي confirm API
+- [ ] مسار Select: `country_id` + `city_id` إجباري لو مفيش GPS
+- [ ] مسار GPS: حقول `latitude` + `longitude` (أو زر geolocation)
+- [ ] Validation فرونت: إما select كامل أو lat+lng مع بعض
+- [ ] (اختياري) السماح بالاتنين معاً لدقة أعلى
+- [ ] صفحة confirm-offer زي ما هي
 
 ---
 
-## مفيش تغيير مطلوب بخصوص Radius
+## أثر الميزة على العميل
 
-العميل مش بيختار نطاق. كل اللي محتاجه: اختيار موقع العرض بدقة (دولة + مدينة).
+- واجهة إضافية اختيارية (GPS)
+- لو استخدم GPS: النظام يحدد أقرب مدينة لوحده
+- توزيع أفضل على الشركات (شوب + شراء تلقائي) لما الإحداثيات موجودة

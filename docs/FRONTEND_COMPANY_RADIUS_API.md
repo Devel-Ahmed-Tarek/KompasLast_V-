@@ -159,6 +159,8 @@ GET /api/company/shop
   "id": 123,
   "country_id": 1,
   "city_id": 6,
+  "latitude": 52.51,
+  "longitude": 13.39,
   "country": { "id": 1, "name": "Deutschland" },
   "city": { "id": 6, "name": "Brandenburg" },
   "type_id": { "id": 1, "name": "Umzug", "price": 150 },
@@ -167,6 +169,8 @@ GET /api/company/shop
   "answers": [ ... ]
 }
 ```
+
+> `latitude` / `longitude` ممكن يكونوا `null` لو العميل اختار مدينة من الـ select فقط بدون GPS.
 
 ### مهم للفرونت
 - **مفيش تغيير في شكل الـ JSON**

@@ -23,6 +23,8 @@ class OfferWithAnswersResource extends JsonResource
             'type_id' => $this->type_id,
             'country_id' => $this->country_id,
             'city_id' => $this->city_id,
+            'latitude' => $this->latitude,
+            'longitude' => $this->longitude,
             'type' => [
                 'id'         => $this->type->id,
                 'name'       => $this->type->getTranslation('name', $lang),

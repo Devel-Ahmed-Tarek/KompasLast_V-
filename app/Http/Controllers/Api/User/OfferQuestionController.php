@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\User;
 
 use App\Helpers\HelperFunc;
+use App\Helpers\LocationMatcher;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Website\QuestionResource;
 use App\Mail\OfferCreated;
@@ -591,8 +592,10 @@ class OfferQuestionController extends Controller
         // Validation rules
         $validator = Validator::make($request->all(), [
             'type_id' => 'required|exists:types,id',
-            'country_id' => 'required|exists:countries,id',
-            'city_id' => 'required|exists:cities,id',
+            'country_id' => 'nullable|exists:countries,id',
+            'city_id' => 'nullable|exists:cities,id',
+            'latitude' => 'nullable|numeric|between:-90,90|required_with:longitude',
+            'longitude' => 'nullable|numeric|between:-180,180|required_with:latitude',
             'answers' => 'required|array',
             'answers.*.question_id' => 'required|exists:type_questions,id',
             'answers.*.answer' => 'nullable|string',
@@ -624,18 +627,21 @@ class OfferQuestionController extends Controller
             'Nach_zipcode' => 'nullable|string|max:255',
         ]);
 
-        // Validate that city belongs to country
-        if ($request->has('country_id') && $request->has('city_id')) {
-            $city = \App\Models\City::find($request->city_id);
-            if ($city && $city->country_id != $request->country_id) {
-                return HelperFunc::sendResponse(422, 'Validation Error', [
-                    'city_id' => ['The selected city does not belong to the selected country.']
-                ]);
-            }
-        }
-
         if ($validator->fails()) {
             return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors());
+        }
+
+        $location = LocationMatcher::resolveOfferLocation([
+            'country_id' => $request->country_id,
+            'city_id'    => $request->city_id,
+            'latitude'   => $request->latitude,
+            'longitude'  => $request->longitude,
+        ]);
+
+        if ($location['error']) {
+            return HelperFunc::sendResponse(422, 'Validation Error', [
+                'location' => [$location['error']],
+            ]);
         }
 
         try {
@@ -674,8 +680,10 @@ class OfferQuestionController extends Controller
             // إنشاء أو تحديث الـ Offer
             $offerData = [
                 'type_id' => $typeId,
-                'country_id' => $request->country_id,
-                'city_id' => $request->city_id,
+                'country_id' => $location['country_id'],
+                'city_id' => $location['city_id'],
+                'latitude' => $location['latitude'],
+                'longitude' => $location['longitude'],
                 'name' => $request->name ?? 'Guest User',
                 'email' => $request->email ?? 'guest@example.com',
                 'phone' => $request->phone ?? '',

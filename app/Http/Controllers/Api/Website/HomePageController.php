@@ -119,8 +119,10 @@ class HomePageController extends Controller
 
         $Validator = Validator::make($request->all(), [
             'type_id'        => 'required|exists:types,id',
-            'country_id'     => 'required|exists:countries,id',
-            'city_id'        => 'required|exists:cities,id',
+            'country_id'     => 'nullable|exists:countries,id',
+            'city_id'        => 'nullable|exists:cities,id',
+            'latitude'       => 'nullable|numeric|between:-90,90|required_with:longitude',
+            'longitude'      => 'nullable|numeric|between:-180,180|required_with:latitude',
             'name'           => 'required|string|max:255',
             'email'          => 'required|email|max:255',
             'phone'          => 'required|string|max:20',
@@ -146,18 +148,21 @@ class HomePageController extends Controller
             'Nach_zipcode'   => 'nullable|string|max:255',
         ]);
 
-        // Validate that city belongs to country
-        if ($request->has('country_id') && $request->has('city_id')) {
-            $city = \App\Models\City::find($request->city_id);
-            if ($city && $city->country_id != $request->country_id) {
-                return HelperFunc::sendResponse(422, 'Validation Error', [
-                    'city_id' => ['The selected city does not belong to the selected country.']
-                ]);
-            }
-        }
-
         if ($Validator->fails()) {
             return HelperFunc::sendResponse(422, 'هناك رسائل تحقق', $Validator->messages()->all());
+        }
+
+        $location = LocationMatcher::resolveOfferLocation([
+            'country_id' => $request->country_id,
+            'city_id'    => $request->city_id,
+            'latitude'   => $request->latitude,
+            'longitude'  => $request->longitude,
+        ]);
+
+        if ($location['error']) {
+            return HelperFunc::sendResponse(422, 'Validation Error', [
+                'location' => [$location['error']],
+            ]);
         }
 
         try {
@@ -171,8 +176,10 @@ class HomePageController extends Controller
 
             $data = [
                 'type_id'          => $request->type_id,
-                'country_id'       => $request->country_id,
-                'city_id'          => $request->city_id,
+                'country_id'       => $location['country_id'],
+                'city_id'          => $location['city_id'],
+                'latitude'         => $location['latitude'],
+                'longitude'        => $location['longitude'],
                 'name'             => $request->name,
                 'email'            => $request->email,
                 'phone'            => $request->phone,

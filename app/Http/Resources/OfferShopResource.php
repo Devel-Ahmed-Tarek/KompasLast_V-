@@ -79,6 +79,8 @@ class OfferShopResource extends JsonResource
             'id'               => $this->id,
             'country_id'       => $this->country_id,
             'city_id'          => $this->city_id,
+            'latitude'         => $this->latitude,
+            'longitude'        => $this->longitude,
             'country'          => $this->when($this->countryRelation, function () use ($lang) {
                 return [
                     'id'   => $this->countryRelation->id,

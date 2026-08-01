@@ -13,6 +13,8 @@ class Offer extends Model
         'type_id',
         'country_id',
         'city_id',
+        'latitude',
+        'longitude',
         'anrede',
         'name',
         'email',
@@ -51,6 +53,8 @@ class Offer extends Model
     protected $casts = [
         'completion_status' => 'string',
         'unit_price'        => 'float',
+        'latitude'          => 'float',
+        'longitude'         => 'float',
     ];
 
     // داخل نموذج Offer

@@ -225,7 +225,9 @@ GET /api/admin/offers?confirm_status=confirmed&filter=new
   "is_confirmed": true,
   "type": { "id": 1, "name": "Umzug" },
   "country_id": 1,
-  "city_id": 6
+  "city_id": 6,
+  "latitude": 52.51,
+  "longitude": 13.39
 }
 ```
 

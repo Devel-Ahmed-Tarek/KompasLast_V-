@@ -59,18 +59,153 @@ class LocationMatcher
     }
 
     /**
-     * Does a company subscription city cover an offer city?
+     * Find the nearest city that has coordinates.
+     * Optionally limit search to one country.
+     */
+    public static function findNearestCity(float $lat, float $lng, ?int $countryId = null): ?City
+    {
+        $query = City::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        if ($countryId) {
+            $query->where('country_id', $countryId);
+        }
+
+        $cities = $query->get();
+        if ($cities->isEmpty()) {
+            return null;
+        }
+
+        $nearest = null;
+        $minDistance = null;
+
+        foreach ($cities as $city) {
+            $distance = self::distanceKm($lat, $lng, $city->latitude, $city->longitude);
+            if ($distance === null) {
+                continue;
+            }
+
+            if ($minDistance === null || $distance < $minDistance) {
+                $minDistance = $distance;
+                $nearest = $city;
+            }
+        }
+
+        return $nearest;
+    }
+
+    /**
+     * Resolve offer location from select and/or coordinates.
+     *
+     * Rules:
+     * - If latitude+longitude sent without city_id → nearest city (auto country/city)
+     * - If city_id (+ country_id) sent → use select; coords optional for precise matching
+     * - If neither coords nor city select → error
+     *
+     * @param  array{country_id?: mixed, city_id?: mixed, latitude?: mixed, longitude?: mixed}  $input
+     * @return array{country_id: int|null, city_id: int|null, latitude: float|null, longitude: float|null, error: string|null}
+     */
+    public static function resolveOfferLocation(array $input): array
+    {
+        $hasLat = array_key_exists('latitude', $input) && $input['latitude'] !== null && $input['latitude'] !== '';
+        $hasLng = array_key_exists('longitude', $input) && $input['longitude'] !== null && $input['longitude'] !== '';
+        $hasCoords = $hasLat && $hasLng;
+
+        $countryId = ! empty($input['country_id']) ? (int) $input['country_id'] : null;
+        $cityId = ! empty($input['city_id']) ? (int) $input['city_id'] : null;
+
+        $latitude = $hasLat ? (float) $input['latitude'] : null;
+        $longitude = $hasLng ? (float) $input['longitude'] : null;
+
+        if ($hasLat xor $hasLng) {
+            return [
+                'country_id' => null,
+                'city_id'    => null,
+                'latitude'   => null,
+                'longitude'  => null,
+                'error'      => 'Both latitude and longitude are required together.',
+            ];
+        }
+
+        // Path A: coords only (or coords + optional country filter) → nearest city
+        if ($hasCoords && ! $cityId) {
+            $nearest = self::findNearestCity($latitude, $longitude, $countryId);
+            if (! $nearest) {
+                return [
+                    'country_id' => null,
+                    'city_id'    => null,
+                    'latitude'   => $latitude,
+                    'longitude'  => $longitude,
+                    'error'      => 'No nearby city with coordinates was found.',
+                ];
+            }
+
+            return [
+                'country_id' => (int) $nearest->country_id,
+                'city_id'    => (int) $nearest->id,
+                'latitude'   => $latitude,
+                'longitude'  => $longitude,
+                'error'      => null,
+            ];
+        }
+
+        // Path B: select required when no city from coords path
+        if (! $cityId || ! $countryId) {
+            return [
+                'country_id' => null,
+                'city_id'    => null,
+                'latitude'   => $latitude,
+                'longitude'  => $longitude,
+                'error'      => 'country_id and city_id are required when coordinates are not provided.',
+            ];
+        }
+
+        $city = City::find($cityId);
+        if (! $city) {
+            return [
+                'country_id' => null,
+                'city_id'    => null,
+                'latitude'   => $latitude,
+                'longitude'  => $longitude,
+                'error'      => 'City not found.',
+            ];
+        }
+
+        if ((int) $city->country_id !== $countryId) {
+            return [
+                'country_id' => null,
+                'city_id'    => null,
+                'latitude'   => $latitude,
+                'longitude'  => $longitude,
+                'error'      => 'The selected city does not belong to the selected country.',
+            ];
+        }
+
+        return [
+            'country_id' => $countryId,
+            'city_id'    => $cityId,
+            'latitude'   => $latitude,
+            'longitude'  => $longitude,
+            'error'      => null,
+        ];
+    }
+
+    /**
+     * Does a company subscription city cover an offer city / offer point?
      *
      * Rules:
      * - Same city_id → always match
      * - radius_km = 0 → exact city only
-     * - radius_km > 0 → match if Haversine distance ≤ radius_km
-     * - Missing coordinates → exact city only (legacy fallback)
+     * - radius_km > 0 → match if distance ≤ radius_km
+     * - Prefer offer lat/lng when present; else city-to-city
      */
     public static function cityCovers(
         City $companyCity,
         City $offerCity,
-        int $radiusKm = 0
+        int $radiusKm = 0,
+        ?float $offerLat = null,
+        ?float $offerLng = null
     ): bool {
         if ((int) $companyCity->id === (int) $offerCity->id) {
             return true;
@@ -80,7 +215,16 @@ class LocationMatcher
             return false;
         }
 
-        $distance = self::distanceBetweenCities($companyCity, $offerCity);
+        if ($offerLat !== null && $offerLng !== null) {
+            $distance = self::distanceKm(
+                $companyCity->latitude,
+                $companyCity->longitude,
+                $offerLat,
+                $offerLng
+            );
+        } else {
+            $distance = self::distanceBetweenCities($companyCity, $offerCity);
+        }
 
         if ($distance === null) {
             return false;
@@ -90,7 +234,7 @@ class LocationMatcher
     }
 
     /**
-     * Does this company cover the offer location (country + city with radius)?
+     * Does this company cover the offer location (country + city/radius)?
      */
     public static function companyCoversOffer(User $company, Offer $offer): bool
     {
@@ -118,10 +262,13 @@ class LocationMatcher
             ? $company->cities
             : $company->cities()->get();
 
+        $offerLat = $offer->latitude !== null ? (float) $offer->latitude : null;
+        $offerLng = $offer->longitude !== null ? (float) $offer->longitude : null;
+
         foreach ($companyCities as $companyCity) {
             $radiusKm = (int) ($companyCity->pivot->radius_km ?? 0);
 
-            if (self::cityCovers($companyCity, $offerCity, $radiusKm)) {
+            if (self::cityCovers($companyCity, $offerCity, $radiusKm, $offerLat, $offerLng)) {
                 return true;
             }
         }
@@ -130,7 +277,7 @@ class LocationMatcher
     }
 
     /**
-     * Filter companies that cover a given offer city (within country + radius).
+     * Filter companies that cover a given offer.
      *
      * @param  Collection<int, User>  $companies
      * @return Collection<int, User>
@@ -172,7 +319,6 @@ class LocationMatcher
                 continue;
             }
 
-            // Candidate cities in the same country (keep matching scoped)
             $candidates = City::query()
                 ->where('country_id', $companyCity->country_id)
                 ->whereNotNull('latitude')
