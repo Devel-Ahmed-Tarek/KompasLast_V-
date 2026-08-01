@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Website;
 
 use App\Helpers\HelperFunc;
+use App\Helpers\LocationMatcher;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Website\HomePageResource;
 use App\Mail\OfferCreated;
@@ -369,10 +370,10 @@ class HomePageController extends Controller
                 return;
             }
 
-            $offer->loadMissing('type');
+            $offer->loadMissing(['type', 'cityRelation']);
 
-            // 1) جلب كل الشركات المطابقة (نوع + دولة + مدينة + موافقة + غير محظورة)
-            //    هنا مش بنفلتر على status لأنه دلالة الشراء التلقائي
+            // 1) جلب الشركات المطابقة (نوع + دولة + موافقة + غير محظورة + عندها مدن)
+            //    المطابقة بالمدينة تتم عبر LocationMatcher (مدينة دقيقة أو داخل radius_km)
             $matchingCompanies = User::where('role', 'company')
                 ->where('ban', '0')
                 ->whereHas('companyDetails', function ($q) {
@@ -384,11 +385,11 @@ class HomePageController extends Controller
                 ->whereHas('countries', function ($q) use ($offer) {
                     $q->where('country_id', $offer->country_id);
                 })
-                ->whereHas('cities', function ($q) use ($offer) {
-                    $q->where('city_id', $offer->city_id);
-                })
-                ->with('wallet')
+                ->whereHas('cities')
+                ->with(['wallet', 'cities', 'countries'])
                 ->get();
+
+            $matchingCompanies = LocationMatcher::filterCompaniesForOffer($matchingCompanies, $offer);
 
             if ($matchingCompanies->isEmpty()) {
                 return;

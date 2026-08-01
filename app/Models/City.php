@@ -9,9 +9,15 @@ use Spatie\Translatable\HasTranslations;
 class City extends Model
 {
     use HasFactory, HasTranslations;
-    
-    protected $fillable = ['name', 'country_id'];
-    public $translatable = ['name']; // تحديد الحقول التي سيتم ترجمتها
+
+    protected $fillable = ['name', 'country_id', 'latitude', 'longitude'];
+
+    public $translatable = ['name'];
+
+    protected $casts = [
+        'latitude'  => 'float',
+        'longitude' => 'float',
+    ];
 
     public function country()
     {
@@ -20,6 +26,8 @@ class City extends Model
 
     public function companies()
     {
-        return $this->belongsToMany(User::class, 'company_cities');
+        return $this->belongsToMany(User::class, 'company_cities')
+            ->withPivot('radius_km')
+            ->withTimestamps();
     }
 }

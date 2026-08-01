@@ -48,6 +48,8 @@ class AdminCityController extends Controller
             'name.fr' => 'nullable|string',
             'name.it' => 'nullable|string',
             'country_id' => 'required|exists:countries,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         if ($validator->fails()) {
@@ -58,6 +60,8 @@ class AdminCityController extends Controller
             $city = new City();
             $city->name = $request->name; // Save multilingual field as JSON
             $city->country_id = $request->country_id;
+            $city->latitude = $request->latitude;
+            $city->longitude = $request->longitude;
             $city->save();
 
             return HelperFunc::sendResponse(201, 'City created successfully', $city->load('country'));
@@ -83,6 +87,8 @@ class AdminCityController extends Controller
             'name.fr' => 'nullable|string',
             'name.it' => 'nullable|string',
             'country_id' => 'sometimes|required|exists:countries,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         if ($validator->fails()) {
@@ -95,6 +101,12 @@ class AdminCityController extends Controller
             }
             if ($request->has('country_id')) {
                 $city->country_id = $request->country_id;
+            }
+            if ($request->has('latitude')) {
+                $city->latitude = $request->latitude;
+            }
+            if ($request->has('longitude')) {
+                $city->longitude = $request->longitude;
             }
             $city->save();
 

@@ -294,6 +294,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     // Company Cities management
     Route::get('company/cities/available', [AdminCompanyController::class, 'getAvailableCities']);
     Route::post('company/cities/add', [AdminCompanyController::class, 'addCity']);
+    Route::post('company/cities/update-radius', [AdminCompanyController::class, 'updateCityRadius']);
     Route::post('company/cities/remove', [AdminCompanyController::class, 'deleteCity']);
     Route::get('company/cities/all', [AdminCompanyController::class, 'getSubscribedCities']);
 

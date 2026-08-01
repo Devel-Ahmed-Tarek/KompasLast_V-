@@ -413,8 +413,9 @@ class AdminCompanyController extends Controller
     public function addCity(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'city_id' => 'required|exists:cities,id',
+            'city_id'    => 'required|exists:cities,id',
             'company_id' => 'required|exists:users,id',
+            'radius_km'  => 'nullable|integer|min:0|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -440,9 +441,47 @@ class AdminCompanyController extends Controller
             return HelperFunc::sendResponse(400, 'City already added', []);
         }
 
-        $user->cities()->attach($request->city_id);
+        $radiusKm = (int) ($request->radius_km ?? 0);
 
-        return HelperFunc::sendResponse(200, 'City added successfully', []);
+        $user->cities()->attach($request->city_id, [
+            'radius_km' => $radiusKm,
+        ]);
+
+        return HelperFunc::sendResponse(200, 'City added successfully', [
+            'city_id'   => (int) $request->city_id,
+            'radius_km' => $radiusKm,
+        ]);
+    }
+
+    public function updateCityRadius(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'city_id'    => 'required|exists:cities,id',
+            'company_id' => 'required|exists:users,id',
+            'radius_km'  => 'required|integer|min:0|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = User::find($request->company_id);
+        if (!$user || $user->role !== 'company') {
+            return HelperFunc::sendResponse(404, 'Company not found', []);
+        }
+
+        if (!$user->cities()->where('city_id', $request->city_id)->exists()) {
+            return HelperFunc::sendResponse(404, 'City not found in company list', []);
+        }
+
+        $user->cities()->updateExistingPivot($request->city_id, [
+            'radius_km' => (int) $request->radius_km,
+        ]);
+
+        return HelperFunc::sendResponse(200, 'City radius updated successfully', [
+            'city_id'   => (int) $request->city_id,
+            'radius_km' => (int) $request->radius_km,
+        ]);
     }
 
     public function deleteCity(Request $request)
@@ -492,7 +531,17 @@ class AdminCompanyController extends Controller
             $query->where('country_id', $request->country_id);
         }
 
-        $subscribedCities = $query->get();
+        $subscribedCities = $query->get()->map(function ($city) {
+            return [
+                'id'         => $city->id,
+                'name'       => $city->name,
+                'country_id' => $city->country_id,
+                'latitude'   => $city->latitude,
+                'longitude'  => $city->longitude,
+                'country'    => $city->country,
+                'radius_km'  => (int) ($city->pivot->radius_km ?? 0),
+            ];
+        });
 
         return HelperFunc::sendResponse(200, 'Subscribed cities fetched successfully', $subscribedCities);
     }

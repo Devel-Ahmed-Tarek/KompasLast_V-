@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Company;
 
 use App\Helpers\HelperFunc;
+use App\Helpers\LocationMatcher;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OfferShopResource;
 use App\Http\Resources\OfferWithAnswersResource;
@@ -47,9 +48,10 @@ class OfferController extends Controller
             ],
         ]));
 
-        // Get company's subscribed countries and cities
+        // Get company's subscribed countries + cities covered by radius
         $companyCountryIds = $currentCompany->countries()->pluck('countries.id')->toArray();
-        $companyCityIds = $currentCompany->cities()->pluck('cities.id')->toArray();
+        $currentCompany->load('cities');
+        $companyCityIds = LocationMatcher::coveredCityIdsForCompany($currentCompany);
 
         // Query offers that are not yet purchased by the logged-in company
         // مقارنة التاريخ - بما أن date من نوع date فقط، نستخدم whereDate
@@ -64,7 +66,7 @@ class OfferController extends Controller
             })
             // Filter by company's subscribed countries
             ->whereIn('country_id', $companyCountryIds)
-            // Filter by company's subscribed cities
+            // Filter by cities covered (exact city or within radius_km)
             ->whereIn('city_id', $companyCityIds)
             ->whereDoesntHave('Shopping_list', function ($query) use ($currentCompanyId) {
                 // Ensure the offer is not in the shopping list of the current company
@@ -179,14 +181,12 @@ class OfferController extends Controller
                 return HelperFunc::sendResponse(403, "Offer location is not specified", []);
             }
 
-            // Check if company is subscribed to the offer's country
-            if (!$user->countries()->where('country_id', $offer->country_id)->exists()) {
-                return HelperFunc::sendResponse(403, "You must subscribe to the offer's country first", []);
-            }
+            $user->loadMissing(['cities', 'countries']);
+            $offer->loadMissing('cityRelation');
 
-            // Check if company is subscribed to the offer's city
-            if (!$user->cities()->where('city_id', $offer->city_id)->exists()) {
-                return HelperFunc::sendResponse(403, "You must subscribe to the offer's city first", []);
+            // Country + city (exact or within company radius_km)
+            if (! LocationMatcher::companyCoversOffer($user, $offer)) {
+                return HelperFunc::sendResponse(403, "Offer location is outside your coverage area", []);
             }
 
             $amountTotal  = $user->wallet->amount;

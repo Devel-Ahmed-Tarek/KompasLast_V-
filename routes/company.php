@@ -40,6 +40,7 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     // Cities management
     Route::get('cities/available', [CompanyProfileController::class, 'getAvailableCities']);
     Route::post('cities/add', [CompanyProfileController::class, 'addCity']);
+    Route::post('cities/update-radius', [CompanyProfileController::class, 'updateCityRadius']);
     Route::post('cities/remove', [CompanyProfileController::class, 'deleteCity']);
     Route::get('cities/all', [CompanyProfileController::class, 'getSubscribedCities']);
     Route::get('cities/by-country/{country_id}', [CompanyProfileController::class, 'getCitiesByCountry']);

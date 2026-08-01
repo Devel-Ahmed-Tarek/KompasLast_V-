@@ -84,7 +84,9 @@ class User extends Authenticatable
 
     public function cities()
     {
-        return $this->belongsToMany(City::class, 'company_cities');
+        return $this->belongsToMany(City::class, 'company_cities')
+            ->withPivot('radius_km')
+            ->withTimestamps();
     }
 
     public function shopping_list()

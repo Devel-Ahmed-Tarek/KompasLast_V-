@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Api\Company;
 
 use App\Helpers\HelperFunc;
+use App\Helpers\LocationMatcher;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyDetail;
 use App\Models\ConfigApp;
@@ -207,10 +208,11 @@ class CompanyProfileController extends Controller
             }
 
             // 1) الأوفرات اللي تنفع: مؤكدة + مفعّلة + لسة فيها count + تاريخها مازال في المستقبل
-            //    + نفس نوع/دولة/مدينة الشركة + الشركة لم تشتريها قبل كده
+            //    + نفس نوع/دولة الشركة + مدينة داخل نطاق الشركة (radius) + الشركة لم تشتريها قبل كده
             $companyTypeIds    = $company->typesComapny()->pluck('types.id')->toArray();
             $companyCountryIds = $company->countries()->pluck('countries.id')->toArray();
-            $companyCityIds    = $company->cities()->pluck('cities.id')->toArray();
+            $company->loadMissing('cities');
+            $companyCityIds    = LocationMatcher::coveredCityIdsForCompany($company);
 
             if (empty($companyTypeIds) || empty($companyCountryIds) || empty($companyCityIds)) {
                 return;
@@ -589,7 +591,8 @@ class CompanyProfileController extends Controller
     public function addCity(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'city_id' => 'required|exists:cities,id',
+            'city_id'    => 'required|exists:cities,id',
+            'radius_km'  => 'nullable|integer|min:0|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -616,7 +619,11 @@ class CompanyProfileController extends Controller
             return HelperFunc::sendResponse(400, 'City already added', []);
         }
 
-        $user->cities()->attach($request->city_id);
+        $radiusKm = (int) ($request->radius_km ?? 0);
+
+        $user->cities()->attach($request->city_id, [
+            'radius_km' => $radiusKm,
+        ]);
 
         $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
         HelperFunc::sendMultilangNotification($admins, "city_added", $user->id, [
@@ -624,7 +631,40 @@ class CompanyProfileController extends Controller
             'de' => 'Neue Stadt hinzugefügt: ' . ($city->name['de'] ?? ''),
         ]);
 
-        return HelperFunc::sendResponse(200, 'City added successfully', []);
+        return HelperFunc::sendResponse(200, 'City added successfully', [
+            'city_id'    => (int) $request->city_id,
+            'radius_km'  => $radiusKm,
+        ]);
+    }
+
+    public function updateCityRadius(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'city_id'   => 'required|exists:cities,id',
+            'radius_km' => 'required|integer|min:0|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return HelperFunc::sendResponse(404, 'User not found', []);
+        }
+
+        if (!$user->cities()->where('city_id', $request->city_id)->exists()) {
+            return HelperFunc::sendResponse(404, 'City not found in your list', []);
+        }
+
+        $user->cities()->updateExistingPivot($request->city_id, [
+            'radius_km' => (int) $request->radius_km,
+        ]);
+
+        return HelperFunc::sendResponse(200, 'City radius updated successfully', [
+            'city_id'   => (int) $request->city_id,
+            'radius_km' => (int) $request->radius_km,
+        ]);
     }
 
     public function deleteCity(Request $request)
@@ -673,7 +713,17 @@ class CompanyProfileController extends Controller
             $query->where('country_id', $request->country_id);
         }
 
-        $subscribedCities = $query->get();
+        $subscribedCities = $query->get()->map(function ($city) {
+            return [
+                'id'         => $city->id,
+                'name'       => $city->name,
+                'country_id' => $city->country_id,
+                'latitude'   => $city->latitude,
+                'longitude'  => $city->longitude,
+                'country'    => $city->country,
+                'radius_km'  => (int) ($city->pivot->radius_km ?? 0),
+            ];
+        });
 
         return HelperFunc::sendResponse(200, 'Subscribed cities fetched successfully', $subscribedCities);
     }
