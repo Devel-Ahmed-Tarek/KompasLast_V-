@@ -13,8 +13,23 @@
 
 | المسار | إيه اللي بيتبعت | إيه اللي بيحصل |
 |--------|------------------|----------------|
-| **A — Select** | `country_id` + `city_id` | المدينة تتحفظ زي ما اختارها |
-| **B — GPS / إحداثيات** | `latitude` + `longitude` | النظام يلاقي **أقرب مدينة** في الداتا ويحط `country_id` + `city_id` أوتوماتيك |
+| **A — Select** | `country_id` + `city_id` | المدينة أو البلدية تتحفظ زي ما اختارها |
+| **B — GPS / إحداثيات** | `latitude` + `longitude` | النظام يلاقي **أقرب مدينة/بلدية** ويحط `country_id` + `city_id` |
+
+**Select الموصى به:** دولة → ولاية (Bundesland) → مدينة أو بلدية.
+
+```
+GET /api/user/states?country_id=1&lang=de
+GET /api/user/states/{state_id}/places?place_type=city
+GET /api/user/states/{state_id}/places?place_type=municipality
+GET /api/user/cities/by-country/{country_id}?state_id={id}&place_type=municipality
+```
+
+`place_type`:
+- `city` = Stadt
+- `municipality` = Gemeinde
+
+بدون `state_id`، `/cities/by-country` بيرجع **المدن فقط** مش كل البلديات.
 
 ### قواعد إلزامية
 

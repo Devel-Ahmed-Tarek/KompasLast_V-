@@ -65,6 +65,7 @@ class LocationMatcher
     public static function findNearestCity(float $lat, float $lng, ?int $countryId = null): ?City
     {
         $query = City::query()
+            ->selectable()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
@@ -72,7 +73,11 @@ class LocationMatcher
             $query->where('country_id', $countryId);
         }
 
-        $cities = $query->get();
+        $cities = self::candidatesInBoundingBox(clone $query, $lat, $lng, 80);
+        if ($cities->isEmpty()) {
+            $cities = $query->get();
+        }
+
         if ($cities->isEmpty()) {
             return null;
         }
@@ -93,6 +98,21 @@ class LocationMatcher
         }
 
         return $nearest;
+    }
+
+    /**
+     * Rough bounding-box filter before Haversine (1 deg lat ≈ 111 km).
+     */
+    private static function candidatesInBoundingBox($query, float $lat, float $lng, int $radiusKm)
+    {
+        $latDelta = max(0.05, $radiusKm / 111);
+        $cosLat = max(0.2, cos(deg2rad($lat)));
+        $lngDelta = max(0.05, $radiusKm / (111 * $cosLat));
+
+        return $query
+            ->whereBetween('latitude', [$lat - $latDelta, $lat + $latDelta])
+            ->whereBetween('longitude', [$lng - $lngDelta, $lng + $lngDelta])
+            ->get();
     }
 
     /**
@@ -319,12 +339,19 @@ class LocationMatcher
                 continue;
             }
 
-            $candidates = City::query()
+            $candidatesQuery = City::query()
+                ->selectable()
                 ->where('country_id', $companyCity->country_id)
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
-                ->where('id', '!=', $companyCity->id)
-                ->get();
+                ->where('id', '!=', $companyCity->id);
+
+            $candidates = self::candidatesInBoundingBox(
+                $candidatesQuery,
+                (float) $companyCity->latitude,
+                (float) $companyCity->longitude,
+                $radiusKm
+            );
 
             foreach ($candidates as $candidate) {
                 if (self::cityCovers($companyCity, $candidate, $radiusKm)) {

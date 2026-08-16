@@ -48,6 +48,8 @@ Route::prefix('user')->group(function () {
 
     // Countries and Cities for website forms
     Route::get('countries', [CountryCityController::class, 'getCountries']);
+    Route::get('states', [CountryCityController::class, 'getStates']);
+    Route::get('states/{state_id}/places', [CountryCityController::class, 'getPlacesByState']);
     Route::get('cities/by-country/{country_id}', [CountryCityController::class, 'getCitiesByCountry']);
 
     Route::get('company/{id}', [CompaneisPageController::class, 'getCompany']);

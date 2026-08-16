@@ -387,6 +387,8 @@ class AdminCompanyController extends Controller
         $validator = Validator::make($request->all(), [
             'company_id' => 'required|exists:users,id',
             'country_id' => 'nullable|exists:countries,id',
+            'state_id'   => 'nullable|exists:states,id',
+            'place_type' => 'nullable|in:city,municipality',
         ]);
 
         if ($validator->fails()) {
@@ -399,10 +401,21 @@ class AdminCompanyController extends Controller
         }
 
         $takenCityIds = $user->cities->pluck('id')->toArray();
-        $query = City::whereNotIn('id', $takenCityIds);
+        $query = City::query()
+            ->selectable()
+            ->whereNotIn('id', $takenCityIds)
+            ->with(['country', 'state']);
 
-        if ($request->has('country_id')) {
+        if ($request->filled('country_id')) {
             $query->where('country_id', $request->country_id);
+        }
+        if ($request->filled('state_id')) {
+            $query->where('state_id', $request->state_id);
+        }
+        if ($request->filled('place_type')) {
+            $query->where('place_type', $request->place_type);
+        } elseif (! $request->filled('state_id')) {
+            $query->where('place_type', City::TYPE_CITY);
         }
 
         $notTakenCities = $query->with('country')->get();
@@ -430,6 +443,10 @@ class AdminCompanyController extends Controller
         $city = City::find($request->city_id);
         if (!$city) {
             return HelperFunc::sendResponse(404, 'City not found', []);
+        }
+
+        if ($city->place_type === City::TYPE_REGION) {
+            return HelperFunc::sendResponse(400, 'Please select a city or municipality, not a state region', []);
         }
 
         // Check if country is subscribed first
@@ -525,7 +542,7 @@ class AdminCompanyController extends Controller
             return HelperFunc::sendResponse(404, 'Company not found', []);
         }
 
-        $query = $user->cities()->with('country');
+        $query = $user->cities()->with(['country', 'state']);
 
         if ($request->has('country_id')) {
             $query->where('country_id', $request->country_id);
@@ -536,9 +553,12 @@ class AdminCompanyController extends Controller
                 'id'         => $city->id,
                 'name'       => $city->name,
                 'country_id' => $city->country_id,
+                'state_id'   => $city->state_id,
+                'place_type' => $city->place_type,
                 'latitude'   => $city->latitude,
                 'longitude'  => $city->longitude,
                 'country'    => $city->country,
+                'state'      => $city->state,
                 'radius_km'  => (int) ($city->pivot->radius_km ?? 0),
             ];
         });

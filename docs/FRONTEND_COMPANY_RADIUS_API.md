@@ -9,7 +9,21 @@
 
 ## الفكرة للفرونت
 
-الشركة تشترك في مدينة وتحدد **نصف قطر تغطية بالكيلومتر**.
+الشركة تشترك في **مدينة أو بلدية** وتحدد **نصف قطر تغطية بالكيلومتر** (`radius_km`).
+
+Select الموصى به: دولة → ولاية → مدينة/بلدية → `radius_km`.
+
+تغطية ألمانيا جاهزة من ملف محلي (`database/data/germany_places.json`): 16 ولاية، 2,056 مدينة (Stadt)، 8,893 بلدية/منطقة (Gemeinde)، الإجمالي 10,949 مكان. كل مكان مربوط بولايته وبإحداثياته. بعد `migrate` شغّل `GermanyGeographySeeder`.
+
+```
+GET /api/company/states?country_id=1
+GET /api/company/states/{state_id}/places?place_type=municipality
+GET /api/company/cities/available?country_id=1&state_id=4&place_type=municipality
+POST /api/company/cities/add
+{ "city_id": 88, "radius_km": 25 }
+```
+
+مثال: بلدية Bernau + `radius_km = 20` → العروض في البلدية دي وما حولها لحد 20 كم تظهر في الشوب والشراء التلقائي.
 
 | `radius_km` | المعنى |
 |-------------|--------|

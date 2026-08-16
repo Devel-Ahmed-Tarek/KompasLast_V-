@@ -12,6 +12,7 @@ use App\Models\Type;
 use App\Models\User;
 use App\Models\Country;
 use App\Models\City;
+use App\Models\State;
 use App\Notifications\PaymentNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use function PHPSTORM_META\type;
@@ -564,6 +565,8 @@ class CompanyProfileController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'country_id' => 'nullable|exists:countries,id',
+            'state_id'   => 'nullable|exists:states,id',
+            'place_type' => 'nullable|in:city,municipality',
         ]);
 
         if ($validator->fails()) {
@@ -576,11 +579,21 @@ class CompanyProfileController extends Controller
         }
 
         $takenCityIds = $user->cities->pluck('id')->toArray();
-        $query = City::whereNotIn('id', $takenCityIds);
+        $query = City::query()
+            ->selectable()
+            ->whereNotIn('id', $takenCityIds)
+            ->with(['country', 'state']);
 
-        // Filter by country if provided
-        if ($request->has('country_id')) {
+        if ($request->filled('country_id')) {
             $query->where('country_id', $request->country_id);
+        }
+        if ($request->filled('state_id')) {
+            $query->where('state_id', $request->state_id);
+        }
+        if ($request->filled('place_type')) {
+            $query->where('place_type', $request->place_type);
+        } elseif (! $request->filled('state_id')) {
+            $query->where('place_type', City::TYPE_CITY);
         }
 
         $notTakenCities = $query->with('country')->get();
@@ -607,6 +620,10 @@ class CompanyProfileController extends Controller
         $city = City::find($request->city_id);
         if (!$city) {
             return HelperFunc::sendResponse(404, 'City not found', []);
+        }
+
+        if ($city->place_type === City::TYPE_REGION) {
+            return HelperFunc::sendResponse(400, 'Please select a city or municipality, not a state region', []);
         }
 
         // Check if country is subscribed first
@@ -706,11 +723,13 @@ class CompanyProfileController extends Controller
             return HelperFunc::sendResponse(404, 'User not found', []);
         }
 
-        $query = $user->cities()->with('country');
+        $query = $user->cities()->with(['country', 'state']);
 
-        // Filter by country if provided
         if ($request->has('country_id')) {
             $query->where('country_id', $request->country_id);
+        }
+        if ($request->filled('state_id')) {
+            $query->where('state_id', $request->state_id);
         }
 
         $subscribedCities = $query->get()->map(function ($city) {
@@ -718,9 +737,12 @@ class CompanyProfileController extends Controller
                 'id'         => $city->id,
                 'name'       => $city->name,
                 'country_id' => $city->country_id,
+                'state_id'   => $city->state_id,
+                'place_type' => $city->place_type,
                 'latitude'   => $city->latitude,
                 'longitude'  => $city->longitude,
                 'country'    => $city->country,
+                'state'      => $city->state,
                 'radius_km'  => (int) ($city->pivot->radius_km ?? 0),
             ];
         });
@@ -728,30 +750,18 @@ class CompanyProfileController extends Controller
         return HelperFunc::sendResponse(200, 'Subscribed cities fetched successfully', $subscribedCities);
     }
 
-    // Get all cities by country
-    public function getCitiesByCountry($country_id)
+    public function getStates(Request $request)
     {
-        $validator = Validator::make(['country_id' => $country_id], [
-            'country_id' => 'required|exists:countries,id',
-        ]);
-
-        if ($validator->fails()) {
-            return HelperFunc::sendResponse(422, 'Validation errors', $validator->messages());
-        }
-
-        $country = Country::with('cities')->find($country_id);
-        
-        if (!$country) {
-            return HelperFunc::sendResponse(404, 'Country not found', []);
-        }
-
-        return HelperFunc::sendResponse(200, 'Cities fetched successfully', [
-            'country' => [
-                'id' => $country->id,
-                'name' => $country->name,
-            ],
-            'cities' => $country->cities
-        ]);
+        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getStates($request);
     }
 
+    public function getPlacesByState(Request $request, $state_id)
+    {
+        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getPlacesByState($request, $state_id);
+    }
+
+    public function getCitiesByCountry(Request $request, $country_id)
+    {
+        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getCitiesByCountry($request, $country_id);
+    }
 }

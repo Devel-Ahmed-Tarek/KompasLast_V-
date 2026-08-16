@@ -14,6 +14,6 @@ class DatabaseSeeder extends Seeder
     {
         // $this->call(TypesTableSeeder::class);
         $this->call(PermissionsSeeder::class);
-
+        $this->call(GermanyGeographySeeder::class);
     }
 }

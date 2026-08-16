@@ -10,7 +10,19 @@ class City extends Model
 {
     use HasFactory, HasTranslations;
 
-    protected $fillable = ['name', 'country_id', 'latitude', 'longitude'];
+    public const TYPE_CITY = 'city';
+    public const TYPE_MUNICIPALITY = 'municipality';
+    public const TYPE_REGION = 'region';
+
+    protected $fillable = [
+        'name',
+        'country_id',
+        'state_id',
+        'place_type',
+        'ags_code',
+        'latitude',
+        'longitude',
+    ];
 
     public $translatable = ['name'];
 
@@ -24,10 +36,20 @@ class City extends Model
         return $this->belongsTo(Country::class);
     }
 
+    public function state()
+    {
+        return $this->belongsTo(State::class);
+    }
+
     public function companies()
     {
         return $this->belongsToMany(User::class, 'company_cities')
             ->withPivot('radius_km')
             ->withTimestamps();
+    }
+
+    public function scopeSelectable($query)
+    {
+        return $query->whereIn('place_type', [self::TYPE_CITY, self::TYPE_MUNICIPALITY]);
     }
 }

@@ -13,6 +13,11 @@ class Country extends Model
     protected $fillable = ['name'];
     public $translatable = ['name']; // تحديد الحقول التي سيتم ترجمتها
 
+    public function states()
+    {
+        return $this->hasMany(State::class);
+    }
+
     public function cities()
     {
         return $this->hasMany(City::class);
