@@ -25,8 +25,11 @@ class AdminCityController extends Controller
         if ($request->filled('place_type')) {
             $query->where('place_type', $request->place_type);
         }
+        if ($request->filled('status')) {
+            $query->where('status', (int) $request->status);
+        }
 
-        $cities = $query->get();
+        $cities = $query->get()->map(fn (City $city) => $this->formatCity($city));
         return HelperFunc::sendResponse(200, 'Cities retrieved successfully', $cities);
     }
 
@@ -38,7 +41,7 @@ class AdminCityController extends Controller
             return HelperFunc::sendResponse(404, 'City not found', []);
         }
 
-        return HelperFunc::sendResponse(200, 'City retrieved successfully', $city);
+        return HelperFunc::sendResponse(200, 'City retrieved successfully', $this->formatCity($city));
     }
 
     // إنشاء مدينة جديدة
@@ -57,6 +60,7 @@ class AdminCityController extends Controller
             'place_type' => 'nullable|in:city,municipality,region',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'status' => 'nullable|integer|in:0,1,2',
         ]);
 
         if ($validator->fails()) {
@@ -71,9 +75,10 @@ class AdminCityController extends Controller
             $city->place_type = $request->place_type ?: City::TYPE_CITY;
             $city->latitude = $request->latitude;
             $city->longitude = $request->longitude;
+            $city->status = $request->has('status') ? (int) $request->status : City::STATUS_ACTIVE;
             $city->save();
 
-            return HelperFunc::sendResponse(201, 'City created successfully', $city->load(['country', 'state']));
+            return HelperFunc::sendResponse(201, 'City created successfully', $this->formatCity($city->load(['country', 'state'])));
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }
@@ -100,6 +105,7 @@ class AdminCityController extends Controller
             'place_type' => 'nullable|in:city,municipality,region',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'status' => 'nullable|integer|in:0,1,2',
         ]);
 
         if ($validator->fails()) {
@@ -125,9 +131,12 @@ class AdminCityController extends Controller
             if ($request->has('longitude')) {
                 $city->longitude = $request->longitude;
             }
+            if ($request->has('status')) {
+                $city->status = (int) $request->status;
+            }
             $city->save();
 
-            return HelperFunc::sendResponse(200, 'City updated successfully', $city->load(['country', 'state']));
+            return HelperFunc::sendResponse(200, 'City updated successfully', $this->formatCity($city->load(['country', 'state'])));
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }
@@ -147,6 +156,27 @@ class AdminCityController extends Controller
         } catch (\Exception $e) {
             return HelperFunc::sendResponse(500, 'An error occurred: ' . $e->getMessage(), []);
         }
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $city = City::find($id);
+        if (!$city) {
+            return HelperFunc::sendResponse(404, 'City not found', []);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|integer|in:0,1,2',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors());
+        }
+
+        $city->status = (int) $request->status;
+        $city->save();
+
+        return HelperFunc::sendResponse(200, 'City status updated successfully', $this->formatCity($city->load(['country', 'state'])));
     }
 
     // Get all cities by country
@@ -170,7 +200,8 @@ class AdminCityController extends Controller
             ->where('country_id', $country_id)
             ->selectable()
             ->with('state')
-            ->get();
+            ->get()
+            ->map(fn (City $city) => $this->formatCity($city));
 
         return HelperFunc::sendResponse(200, 'Cities fetched successfully', [
             'country' => [
@@ -188,6 +219,53 @@ class AdminCityController extends Controller
 
     public function getPlacesByState(Request $request, $state_id)
     {
-        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getPlacesByState($request, $state_id);
+        $state = \App\Models\State::find($state_id);
+        if (! $state) {
+            return HelperFunc::sendResponse(404, 'State not found', []);
+        }
+
+        $query = City::query()
+            ->where('state_id', $state_id)
+            ->selectable()
+            ->with('state')
+            ->orderBy('id');
+
+        if ($request->filled('place_type') && in_array($request->place_type, [City::TYPE_CITY, City::TYPE_MUNICIPALITY], true)) {
+            $query->where('place_type', $request->place_type);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', (int) $request->status);
+        }
+
+        $places = $query->get()->map(fn (City $city) => $this->formatCity($city));
+
+        return HelperFunc::sendResponse(200, 'Places retrieved successfully', [
+            'state' => [
+                'id'         => $state->id,
+                'country_id' => $state->country_id,
+                'code'       => $state->code,
+                'name'       => $state->name,
+            ],
+            'places' => $places,
+        ]);
+    }
+
+    private function formatCity(City $city): array
+    {
+        return [
+            'id'           => $city->id,
+            'country_id'   => $city->country_id,
+            'state_id'     => $city->state_id,
+            'place_type'   => $city->place_type,
+            'ags_code'     => $city->ags_code,
+            'name'         => $city->name,
+            'latitude'     => $city->latitude,
+            'longitude'    => $city->longitude,
+            'status'       => (int) $city->status,
+            'status_label' => $city->status_label,
+            'disabled'     => $city->disabled,
+            'country'      => $city->relationLoaded('country') ? $city->country : null,
+            'state'        => $city->relationLoaded('state') ? $city->state : null,
+        ];
     }
 }

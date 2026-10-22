@@ -581,6 +581,7 @@ class CompanyProfileController extends Controller
         $takenCityIds = $user->cities->pluck('id')->toArray();
         $query = City::query()
             ->selectable()
+            ->visibleToCompanies()
             ->whereNotIn('id', $takenCityIds)
             ->with(['country', 'state']);
 
@@ -624,6 +625,14 @@ class CompanyProfileController extends Controller
 
         if ($city->place_type === City::TYPE_REGION) {
             return HelperFunc::sendResponse(400, 'Please select a city or municipality, not a state region', []);
+        }
+
+        if ($city->isComingSoon()) {
+            return HelperFunc::sendResponse(400, 'This city is coming soon', []);
+        }
+
+        if (!$city->isAvailable()) {
+            return HelperFunc::sendResponse(400, 'This city is not available', []);
         }
 
         // Check if country is subscribed first
@@ -672,6 +681,11 @@ class CompanyProfileController extends Controller
 
         if (!$user->cities()->where('city_id', $request->city_id)->exists()) {
             return HelperFunc::sendResponse(404, 'City not found in your list', []);
+        }
+
+        $city = City::find($request->city_id);
+        if ($city && ! $city->isAvailable()) {
+            return HelperFunc::sendResponse(400, $city->isComingSoon() ? 'This city is coming soon' : 'This city is not available', []);
         }
 
         $user->cities()->updateExistingPivot($request->city_id, [
@@ -723,7 +737,7 @@ class CompanyProfileController extends Controller
             return HelperFunc::sendResponse(404, 'User not found', []);
         }
 
-        $query = $user->cities()->with(['country', 'state']);
+        $query = $user->cities()->visibleToCompanies()->with(['country', 'state']);
 
         if ($request->has('country_id')) {
             $query->where('country_id', $request->country_id);
@@ -734,16 +748,19 @@ class CompanyProfileController extends Controller
 
         $subscribedCities = $query->get()->map(function ($city) {
             return [
-                'id'         => $city->id,
-                'name'       => $city->name,
-                'country_id' => $city->country_id,
-                'state_id'   => $city->state_id,
-                'place_type' => $city->place_type,
-                'latitude'   => $city->latitude,
-                'longitude'  => $city->longitude,
-                'country'    => $city->country,
-                'state'      => $city->state,
-                'radius_km'  => (int) ($city->pivot->radius_km ?? 0),
+                'id'           => $city->id,
+                'name'         => $city->name,
+                'country_id'   => $city->country_id,
+                'state_id'     => $city->state_id,
+                'place_type'   => $city->place_type,
+                'latitude'     => $city->latitude,
+                'longitude'    => $city->longitude,
+                'status'       => (int) $city->status,
+                'status_label' => $city->status_label,
+                'disabled'     => $city->disabled,
+                'country'      => $city->country,
+                'state'        => $city->state,
+                'radius_km'    => (int) ($city->pivot->radius_km ?? 0),
             ];
         });
 
@@ -757,11 +774,11 @@ class CompanyProfileController extends Controller
 
     public function getPlacesByState(Request $request, $state_id)
     {
-        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getPlacesByState($request, $state_id);
+        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getPlacesByStateForCompany($request, $state_id);
     }
 
     public function getCitiesByCountry(Request $request, $country_id)
     {
-        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getCitiesByCountry($request, $country_id);
+        return app(\App\Http\Controllers\Api\Website\CountryCityController::class)->getCitiesByCountryForCompany($request, $country_id);
     }
 }

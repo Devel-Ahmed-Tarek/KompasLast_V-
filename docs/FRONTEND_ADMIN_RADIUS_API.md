@@ -9,9 +9,11 @@
 
 ## الفكرة للفرونت
 
-1. إدارة المدن (مع `latitude` / `longitude`)
+1. إدارة المدن (مع `latitude` / `longitude` و `status`)
 2. إدارة اشتراك الشركات في المدن مع `radius_km`
 3. عرض هل العميل أكّد العرض ولا لأ (`confirm_status`)
+
+حالة المدينة (`status`): `0` مقفولة، `1` شغالة، `2` قريبًا. التفاصيل الكاملة في `FRONTEND_CITY_STATUS_API.md`.
 
 ---
 
@@ -32,8 +34,19 @@ GET /api/admin/cities?country_id=1
   "name": { "de": "Berlin", "en": "Berlin", "ar": "برلين" },
   "latitude": 52.52,
   "longitude": 13.405,
+  "status": 1,
+  "status_label": "active",
   "country": { ... }
 }
+```
+
+فلتر اختياري: `GET /api/admin/cities?status=0` أو `1` أو `2`.
+
+تغيير الحالة من الأزرار:
+
+```
+PATCH /api/admin/cities/{id}/status
+{ "status": 2 }
 ```
 
 ---

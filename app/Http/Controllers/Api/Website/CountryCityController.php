@@ -73,6 +73,16 @@ class CountryCityController extends Controller
 
     public function getCitiesByCountry(Request $request, $country_id)
     {
+        return $this->listCitiesByCountry($request, $country_id, false);
+    }
+
+    public function getCitiesByCountryForCompany(Request $request, $country_id)
+    {
+        return $this->listCitiesByCountry($request, $country_id, true);
+    }
+
+    private function listCitiesByCountry(Request $request, $country_id, bool $forCompany)
+    {
         $language = $this->resolveLanguage($request);
         App::setLocale($language);
 
@@ -86,6 +96,8 @@ class CountryCityController extends Controller
             ->selectable()
             ->orderBy('id');
 
+        $forCompany ? $query->visibleToCompanies() : $query->available();
+
         if ($request->filled('state_id')) {
             $query->where('state_id', $request->state_id);
         }
@@ -96,8 +108,8 @@ class CountryCityController extends Controller
             $query->where('place_type', City::TYPE_CITY);
         }
 
-        $citiesData = $query->get()->map(function ($city) use ($language) {
-            return [
+        $citiesData = $query->get()->map(function ($city) use ($language, $forCompany) {
+            $row = [
                 'id'         => $city->id,
                 'state_id'   => $city->state_id,
                 'place_type' => $city->place_type,
@@ -105,6 +117,14 @@ class CountryCityController extends Controller
                 'latitude'   => $city->latitude,
                 'longitude'  => $city->longitude,
             ];
+
+            if ($forCompany) {
+                $row['status'] = (int) $city->status;
+                $row['status_label'] = $city->status_label;
+                $row['disabled'] = $city->disabled;
+            }
+
+            return $row;
         });
 
         return HelperFunc::sendResponse(200, 'Cities retrieved successfully', [
@@ -117,6 +137,16 @@ class CountryCityController extends Controller
     }
 
     public function getPlacesByState(Request $request, $state_id)
+    {
+        return $this->listPlacesByState($request, $state_id, false);
+    }
+
+    public function getPlacesByStateForCompany(Request $request, $state_id)
+    {
+        return $this->listPlacesByState($request, $state_id, true);
+    }
+
+    private function listPlacesByState(Request $request, $state_id, bool $forCompany)
     {
         $language = $this->resolveLanguage($request);
         App::setLocale($language);
@@ -131,12 +161,14 @@ class CountryCityController extends Controller
             ->selectable()
             ->orderBy('id');
 
+        $forCompany ? $query->visibleToCompanies() : $query->available();
+
         if ($request->filled('place_type') && in_array($request->place_type, [City::TYPE_CITY, City::TYPE_MUNICIPALITY], true)) {
             $query->where('place_type', $request->place_type);
         }
 
-        $places = $query->get()->map(function ($city) use ($language) {
-            return [
+        $places = $query->get()->map(function ($city) use ($language, $forCompany) {
+            $row = [
                 'id'         => $city->id,
                 'state_id'   => $city->state_id,
                 'place_type' => $city->place_type,
@@ -144,6 +176,14 @@ class CountryCityController extends Controller
                 'latitude'   => $city->latitude,
                 'longitude'  => $city->longitude,
             ];
+
+            if ($forCompany) {
+                $row['status'] = (int) $city->status;
+                $row['status_label'] = $city->status_label;
+                $row['disabled'] = $city->disabled;
+            }
+
+            return $row;
         });
 
         return HelperFunc::sendResponse(200, 'Places retrieved successfully', [

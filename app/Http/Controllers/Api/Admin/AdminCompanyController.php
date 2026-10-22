@@ -403,6 +403,7 @@ class AdminCompanyController extends Controller
         $takenCityIds = $user->cities->pluck('id')->toArray();
         $query = City::query()
             ->selectable()
+            ->visibleToCompanies()
             ->whereNotIn('id', $takenCityIds)
             ->with(['country', 'state']);
 
@@ -449,6 +450,14 @@ class AdminCompanyController extends Controller
             return HelperFunc::sendResponse(400, 'Please select a city or municipality, not a state region', []);
         }
 
+        if ($city->isComingSoon()) {
+            return HelperFunc::sendResponse(400, 'This city is coming soon', []);
+        }
+
+        if (!$city->isAvailable()) {
+            return HelperFunc::sendResponse(400, 'This city is not available', []);
+        }
+
         // Check if country is subscribed first
         if (!$user->countries()->where('country_id', $city->country_id)->exists()) {
             return HelperFunc::sendResponse(400, 'Company must subscribe to the country first', []);
@@ -489,6 +498,11 @@ class AdminCompanyController extends Controller
 
         if (!$user->cities()->where('city_id', $request->city_id)->exists()) {
             return HelperFunc::sendResponse(404, 'City not found in company list', []);
+        }
+
+        $city = City::find($request->city_id);
+        if ($city && ! $city->isAvailable()) {
+            return HelperFunc::sendResponse(400, $city->isComingSoon() ? 'This city is coming soon' : 'This city is not available', []);
         }
 
         $user->cities()->updateExistingPivot($request->city_id, [
@@ -550,16 +564,19 @@ class AdminCompanyController extends Controller
 
         $subscribedCities = $query->get()->map(function ($city) {
             return [
-                'id'         => $city->id,
-                'name'       => $city->name,
-                'country_id' => $city->country_id,
-                'state_id'   => $city->state_id,
-                'place_type' => $city->place_type,
-                'latitude'   => $city->latitude,
-                'longitude'  => $city->longitude,
-                'country'    => $city->country,
-                'state'      => $city->state,
-                'radius_km'  => (int) ($city->pivot->radius_km ?? 0),
+                'id'           => $city->id,
+                'name'         => $city->name,
+                'country_id'   => $city->country_id,
+                'state_id'     => $city->state_id,
+                'place_type'   => $city->place_type,
+                'latitude'     => $city->latitude,
+                'longitude'    => $city->longitude,
+                'status'       => (int) $city->status,
+                'status_label' => $city->status_label,
+                'disabled'     => $city->disabled,
+                'country'      => $city->country,
+                'state'        => $city->state,
+                'radius_km'    => (int) ($city->pivot->radius_km ?? 0),
             ];
         });
 

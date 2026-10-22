@@ -312,6 +312,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::post('cities', [AdminCityController::class, 'store']);
     Route::get('cities/{id}', [AdminCityController::class, 'show']);
     Route::put('cities/{id}', [AdminCityController::class, 'update']);
+    Route::patch('cities/{id}/status', [AdminCityController::class, 'updateStatus']);
     Route::delete('cities/{id}', [AdminCityController::class, 'destroy']);
     Route::get('cities/by-country/{country_id}', [AdminCityController::class, 'getCitiesByCountry']);
 });

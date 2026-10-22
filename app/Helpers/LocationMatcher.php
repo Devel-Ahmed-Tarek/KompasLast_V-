@@ -66,6 +66,7 @@ class LocationMatcher
     {
         $query = City::query()
             ->selectable()
+            ->available()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
@@ -192,6 +193,16 @@ class LocationMatcher
             ];
         }
 
+        if (! $city->isAvailable()) {
+            return [
+                'country_id' => null,
+                'city_id'    => null,
+                'latitude'   => $latitude,
+                'longitude'  => $longitude,
+                'error'      => 'This city is not available.',
+            ];
+        }
+
         if ((int) $city->country_id !== $countryId) {
             return [
                 'country_id' => null,
@@ -274,7 +285,7 @@ class LocationMatcher
             ? $offer->cityRelation
             : City::find($offer->city_id);
 
-        if (! $offerCity) {
+        if (! $offerCity || ! $offerCity->isAvailable()) {
             return false;
         }
 
@@ -286,6 +297,10 @@ class LocationMatcher
         $offerLng = $offer->longitude !== null ? (float) $offer->longitude : null;
 
         foreach ($companyCities as $companyCity) {
+            if (! $companyCity->isAvailable()) {
+                continue;
+            }
+
             $radiusKm = (int) ($companyCity->pivot->radius_km ?? 0);
 
             if (self::cityCovers($companyCity, $offerCity, $radiusKm, $offerLat, $offerLng)) {
@@ -328,6 +343,10 @@ class LocationMatcher
         $coveredIds = [];
 
         foreach ($companyCities as $companyCity) {
+            if (! $companyCity->isAvailable()) {
+                continue;
+            }
+
             $coveredIds[] = (int) $companyCity->id;
 
             $radiusKm = (int) ($companyCity->pivot->radius_km ?? 0);
@@ -341,6 +360,7 @@ class LocationMatcher
 
             $candidatesQuery = City::query()
                 ->selectable()
+                ->available()
                 ->where('country_id', $companyCity->country_id)
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
