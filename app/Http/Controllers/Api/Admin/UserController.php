@@ -10,6 +10,7 @@ use App\Models\CompanyDetail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -371,22 +372,37 @@ class UserController extends Controller
     }
     public function destroy($user_id)
     {
-        // Find the user or return 404 if not found
         $user = User::findOrFail($user_id);
 
-        // Delete user image if it exists
-        if ($user->img) {
-            HelperFunc::deleteFile(public_path($user->img));
+        try {
+            DB::transaction(function () use ($user) {
+                if ($user->img && ! str_starts_with((string) $user->img, 'http')) {
+                    HelperFunc::deleteFile(public_path($user->img));
+                }
+
+                $user->tokens()->delete();
+                $user->notifications()->delete();
+                $user->roles()->detach();
+
+                if (method_exists($user, 'permissions')) {
+                    $user->permissions()->detach();
+                }
+
+                // Hard delete — users has no deleted_at / SoftDeletes.
+                // unique:users,email is global across admin/company/user.
+                $deleted = $user->delete();
+
+                if (! $deleted) {
+                    throw new \RuntimeException('User row was not removed');
+                }
+            });
+        } catch (\Throwable $e) {
+            return HelperFunc::sendResponse(500, 'User could not be deleted', [
+                'error' => $e->getMessage(),
+            ]);
         }
 
-        // Detach all roles associated with the user (if using Spatie Laravel Permissions)
-        $user->roles()->detach();
-
-        // Delete the user
-        $user->delete();
-
-        // Return a success response
-        return HelperFunc::sendResponse(200, "User deleted successfully");
+        return HelperFunc::sendResponse(200, 'User deleted successfully');
     }
 
     public function updateAvailableNotification(Request $request)
