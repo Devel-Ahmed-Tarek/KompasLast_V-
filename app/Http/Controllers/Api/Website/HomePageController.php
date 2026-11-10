@@ -212,6 +212,7 @@ class HomePageController extends Controller
                 'status'           => $status,
                 'confirm_status'   => 'pending',
                 'confirm_token'    => $confirmToken,
+                'track_token'      => \Illuminate\Support\Str::random(64),
                 'confirmed_at'     => null,
                 'created_at'       => now(),
                 'updated_at'       => now(),
@@ -223,7 +224,9 @@ class HomePageController extends Controller
 
             // send email to user with confirmation link (web route, no /api prefix)
             $locale     = $request->lang;
-            $confirmUrl = "https://auftragkompass.de/" . $locale . "/confirm-offer/?token=" . $confirmToken;
+            $trackingBase = rtrim(env('TRACKING_APP_URL', 'https://track.auftragkompass.de'), '/');
+            $locale       = in_array($locale, ['de', 'en', 'ar', 'fr', 'it'], true) ? $locale : 'de';
+            $confirmUrl   = $trackingBase . '/' . $locale . '/confirm/' . $confirmToken;
 
             Mail::to($request->email)->send(new OfferCreated($locale, $confirmUrl));
 
@@ -328,6 +331,9 @@ class HomePageController extends Controller
         try {
             $offer->confirm_status = 'confirmed';
             $offer->confirm_token  = null;
+            if (! $offer->track_token) {
+                $offer->track_token = \Illuminate\Support\Str::random(64);
+            }
             $offer->confirmed_at   = now();
             $offer->save();
 
@@ -537,5 +543,26 @@ class HomePageController extends Controller
         ];
 
         return HelperFunc::sendResponse(200, 'Config found', $data);
+    }
+
+    /**
+     * Public branding for customer tracking portal / website chrome.
+     */
+    public function branding()
+    {
+        $config = ConfigApp::first();
+
+        if (! $config) {
+            return HelperFunc::sendResponse(404, 'Config not found', []);
+        }
+
+        return HelperFunc::sendResponse(200, 'OK', [
+            'name'      => $config->name ?: 'AuftragKompass',
+            'website'   => $config->website ?: 'https://auftragkompass.de',
+            'email'     => $config->email,
+            'phone'     => $config->phone,
+            'logo'      => $config->logo ? asset($config->logo) : null,
+            'logo_dark' => $config->logo_dark ? asset($config->logo_dark) : null,
+        ]);
     }
 }

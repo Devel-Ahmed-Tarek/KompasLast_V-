@@ -47,6 +47,7 @@ class Offer extends Model
         'status',
         'confirm_status',
         'confirm_token',
+        'track_token',
         'confirmed_at',
     ];
 

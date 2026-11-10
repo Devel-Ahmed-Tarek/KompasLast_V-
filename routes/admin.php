@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Admin\AdminFaqPageController;
 use App\Http\Controllers\Api\Admin\AdminFormController;
 use App\Http\Controllers\Api\Admin\AdminImprintPageController;
 use App\Http\Controllers\Api\Admin\AdminModelOffersController;
+use App\Http\Controllers\Api\Admin\AdminOfferChatController;
 use App\Http\Controllers\Api\Admin\AdminOfferController;
 use App\Http\Controllers\Api\Admin\AdminOfferExecutionController;
 use App\Http\Controllers\Api\Admin\AdminOfferFakeReportController;
@@ -95,6 +96,12 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::get('offers', [AdminOfferController::class, 'getFilteredOffers']);
     Route::get('offers/{id}', [AdminOfferController::class, 'show']);
     Route::post('offers/{id}/unit-price', [AdminOfferController::class, 'updateUnitPrice']);
+
+    // Offer chat monitoring (read-only)
+    Route::get('chats', [AdminOfferChatController::class, 'index']);
+    Route::get('chats/{conversationId}', [AdminOfferChatController::class, 'show']);
+    Route::get('offers/{offerId}/chats', [AdminOfferChatController::class, 'byOffer']);
+    Route::get('offers/{offerId}/chats/{companyId}', [AdminOfferChatController::class, 'byOfferCompany']);
 
     // Contacts management
     Route::get('contact', [AdminContactController::class, 'index']);

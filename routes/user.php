@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\Website\HomePageController;
 use App\Http\Controllers\Api\Website\ImprintPageController;
 use App\Http\Controllers\Api\Website\ModelOffersController;
 use App\Http\Controllers\Api\Website\NavAndFotterController;
+use App\Http\Controllers\Api\Website\CustomerOfferChatController;
+use App\Http\Controllers\Api\Website\CustomerOfferTrackController;
 use App\Http\Controllers\Api\Website\OfferExecutionController;
 use App\Http\Controllers\Api\Website\PartnerPageController;
 use App\Http\Controllers\Api\Website\PrivacyPageController;
@@ -30,6 +32,7 @@ Route::prefix('user')->group(function () {
 
     Route::get('home', [HomePageController::class, 'index']);
     Route::get('check-config', [HomePageController::class, 'checkConfig']);
+    Route::get('branding', [HomePageController::class, 'branding']);
     Route::get('offers/confirm/{token}', [HomePageController::class, 'confirmOffer']);
     Route::get('aboutus', [AboutUsPageController::class, 'index']);
     Route::get('blogs', [BlogPageController::class, 'GetPageBlogs']);
@@ -60,6 +63,21 @@ Route::prefix('user')->group(function () {
     Route::post('/offers/rate', [OfferExecutionController::class, 'store']);
     Route::get('/offers/{id}/info', [OfferExecutionController::class, 'getInfoOffer']);
     Route::post('/offers/announcements', [OfferExecutionController::class, 'storeAnnouncement']);
+
+    // Customer order tracking portal (token-based, no login)
+    // Use offer-track to avoid clashing with /user/track/visitor
+    Route::prefix('offer-track/{token}')->group(function () {
+        Route::get('/', [CustomerOfferTrackController::class, 'show']);
+        Route::post('/confirm', [CustomerOfferTrackController::class, 'confirm']);
+        Route::post('/executed', [CustomerOfferTrackController::class, 'markExecuted']);
+        Route::post('/rate', [CustomerOfferTrackController::class, 'rate']);
+        Route::post('/announce', [CustomerOfferTrackController::class, 'announce']);
+
+        // Chat with companies that purchased this offer
+        Route::get('/chats', [CustomerOfferChatController::class, 'index']);
+        Route::get('/chats/{companyId}', [CustomerOfferChatController::class, 'show']);
+        Route::post('/chats/{companyId}', [CustomerOfferChatController::class, 'store']);
+    });
 
     // Submit Offer Form (Complete Form Submission)
     Route::post('/offers/submit-form', [OfferQuestionController::class, 'submitOfferForm']);

@@ -733,6 +733,7 @@ class OfferQuestionController extends Controller
             $offerData['status']         = $status;
             $offerData['confirm_status'] = 'pending';
             $offerData['confirm_token']  = \Illuminate\Support\Str::random(64);
+            $offerData['track_token']    = \Illuminate\Support\Str::random(64);
             $offerData['confirmed_at']   = null;
 
             Log::info('=== Creating Offer ===', [
@@ -1058,7 +1059,9 @@ class OfferQuestionController extends Controller
             // إرسال البريد الإلكتروني مع رابط التأكيد (web route, no /api prefix)
             if ($request->email) {
                 try {
-                    $confirmUrl = "https://auftragkompass.de/" . $lang . "/confirm-offer/?token=" . $offer->confirm_token;
+                    $trackingBase = rtrim(env('TRACKING_APP_URL', 'https://track.auftragkompass.de'), '/');
+                    $locale       = in_array($lang, ['de', 'en', 'ar', 'fr', 'it'], true) ? $lang : 'de';
+                    $confirmUrl   = $trackingBase . '/' . $locale . '/confirm/' . $offer->confirm_token;
                     Mail::to($request->email)->send(new OfferCreated($lang, $confirmUrl));
                 } catch (\Exception $e) {
                     Log::error('Error sending user email', ['error' => $e->getMessage()]);

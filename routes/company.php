@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\ConfigAppController;
 use App\Http\Controllers\Api\Company\CompanyAuthController;
 use App\Http\Controllers\Api\Company\CompanyDachbouredController;
+use App\Http\Controllers\Api\Company\CompanyOfferChatController;
 use App\Http\Controllers\Api\Company\CompanyOrderController;
 use App\Http\Controllers\Api\Company\CompanyProfileController;
 use App\Http\Controllers\Api\Company\OfferController;
@@ -74,6 +75,13 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     Route::post('favorites/add', [OfferController::class, 'addToFavorites']);
     Route::post('favorites/remove', [OfferController::class, 'removeFromFavorites']);
     Route::get('favorites/check', [OfferController::class, 'checkFavorite']);
+
+    // Offer chat with customers
+    Route::get('chats', [CompanyOfferChatController::class, 'index']);
+    Route::get('chats/unread', [CompanyOfferChatController::class, 'unread']);
+    Route::post('chats/open', [CompanyOfferChatController::class, 'open']);
+    Route::get('chats/{conversationId}', [CompanyOfferChatController::class, 'show']);
+    Route::post('chats/{conversationId}', [CompanyOfferChatController::class, 'store']);
 
     Route::get('/{id}/profile', [CompanyProfileController::class, 'show']);
     Route::put('/{status}/profile', [CompanyProfileController::class, 'updateDinamicOfferCompany']);
