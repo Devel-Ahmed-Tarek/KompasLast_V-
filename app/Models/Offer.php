@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Offer extends Model
 {
@@ -109,5 +110,45 @@ class Offer extends Model
         } else {
             return 'completed';
         }
+    }
+
+    /**
+     * Resolve offer by track_token, confirm_token, or customer email (latest).
+     */
+    public static function findByTrackIdentifier(string $token, array $with = []): ?self
+    {
+        $token = trim(rawurldecode($token));
+        if ($token === '') {
+            return null;
+        }
+
+        $query = static::query()->with($with);
+
+        $offer = (clone $query)
+            ->where(function ($q) use ($token) {
+                $q->where('track_token', $token)
+                    ->orWhere('confirm_token', $token);
+            })
+            ->first();
+
+        if ($offer) {
+            return $offer;
+        }
+
+        if (! filter_var($token, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        $offer = $query
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower($token)])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($offer && ! $offer->track_token) {
+            $offer->track_token = Str::random(64);
+            $offer->save();
+        }
+
+        return $offer;
     }
 }

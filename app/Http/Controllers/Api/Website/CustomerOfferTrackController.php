@@ -258,16 +258,11 @@ class CustomerOfferTrackController extends Controller
     }
 
     /**
-     * Accept track_token (preferred) or legacy confirm_token.
+     * Accept track_token, legacy confirm_token, or customer email (latest offer).
      */
     private function findTrackable(string $token): ?Offer
     {
-        return Offer::with(['type'])
-            ->where(function ($q) use ($token) {
-                $q->where('track_token', $token)
-                    ->orWhere('confirm_token', $token);
-            })
-            ->first();
+        return Offer::findByTrackIdentifier($token, ['type']);
     }
 
     private function resolveLang(Request $request, ?Offer $offer = null): string

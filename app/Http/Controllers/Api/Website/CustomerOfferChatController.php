@@ -80,9 +80,6 @@ class CustomerOfferChatController extends Controller
 
     private function findOffer(string $token): ?Offer
     {
-        return Offer::where(function ($q) use ($token) {
-            $q->where('track_token', $token)
-                ->orWhere('confirm_token', $token);
-        })->first();
+        return Offer::findByTrackIdentifier($token);
     }
 }
