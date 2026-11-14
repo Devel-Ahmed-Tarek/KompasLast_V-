@@ -224,3 +224,24 @@ CUSTOMER_SET_PASSWORD_URL=https://auftragkompass.de/de/set-password
 - الـ offer بيتربط بـ `offers.user_id`
 - الباسورد المؤقت عشوائي لحد ما العميل يعيّن باسه من الإيميل
 - `email_verified_at` بيتعلم بعد نجاح `set-password`
+
+### قاعدة التتبع (مهم)
+
+| الحالة | تتبع بالإيميل؟ | تتبع بـ track_token؟ | بعد Login؟ |
+|--------|-----------------|----------------------|------------|
+| معملش حساب | ✅ نعم | ✅ نعم | — |
+| عمل حساب (اختار Create account) | ❌ ممنوع (`403 login_required`) | ✅ لينك سري لسه شغال | ✅ عبر `?token=` |
+
+لو حاول يتتبع بإيميل عليه حساب:
+
+```json
+{
+  "status": 403,
+  "msg": "Login required to track this email",
+  "data": {
+    "code": "login_required",
+    "email": "max@example.com",
+    "login_url": "https://auftragkompass.de/de/login"
+  }
+}
+```

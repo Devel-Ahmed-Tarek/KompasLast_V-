@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Website;
 
+use App\Exceptions\CustomerAccountRequiredException;
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
@@ -21,7 +22,11 @@ class CustomerOfferTrackController extends Controller
 {
     public function show(Request $request, string $token)
     {
-        $offer = $this->findTrackable($token);
+        try {
+            $offer = $this->findTrackable($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -99,7 +104,11 @@ class CustomerOfferTrackController extends Controller
 
     public function confirm(string $token)
     {
-        $offer = $this->findTrackable($token);
+        try {
+            $offer = $this->findTrackable($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -146,7 +155,11 @@ class CustomerOfferTrackController extends Controller
 
     public function markExecuted(Request $request, string $token)
     {
-        $offer = $this->findTrackable($token);
+        try {
+            $offer = $this->findTrackable($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -184,7 +197,11 @@ class CustomerOfferTrackController extends Controller
 
     public function rate(Request $request, string $token)
     {
-        $offer = $this->findTrackable($token);
+        try {
+            $offer = $this->findTrackable($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -236,7 +253,11 @@ class CustomerOfferTrackController extends Controller
 
     public function announce(Request $request, string $token)
     {
-        $offer = $this->findTrackable($token);
+        try {
+            $offer = $this->findTrackable($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -263,6 +284,18 @@ class CustomerOfferTrackController extends Controller
     private function findTrackable(string $token): ?Offer
     {
         return Offer::findByTrackIdentifier($token, ['type']);
+    }
+
+    private function loginRequiredResponse(CustomerAccountRequiredException $e)
+    {
+        $loginUrl = env('CUSTOMER_LOGIN_URL')
+            ?: (rtrim(ConfigApp::query()->value('website') ?: 'https://auftragkompass.de', '/') . '/de/login');
+
+        return HelperFunc::sendResponse(403, 'Login required to track this email', [
+            'code'      => 'login_required',
+            'email'     => $e->email,
+            'login_url' => $loginUrl,
+        ]);
     }
 
     private function resolveLang(Request $request, ?Offer $offer = null): string

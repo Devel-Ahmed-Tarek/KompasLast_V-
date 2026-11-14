@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api\Website;
 
+use App\Exceptions\CustomerAccountRequiredException;
 use App\Helpers\HelperFunc;
 use App\Http\Controllers\Controller;
+use App\Models\ConfigApp;
 use App\Models\Offer;
-use App\Models\OfferConversation;
 use App\Services\OfferChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -19,7 +20,11 @@ class CustomerOfferChatController extends Controller
 
     public function index(string $token)
     {
-        $offer = $this->findOffer($token);
+        try {
+            $offer = $this->findOffer($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -31,7 +36,11 @@ class CustomerOfferChatController extends Controller
 
     public function show(string $token, int $companyId, Request $request)
     {
-        $offer = $this->findOffer($token);
+        try {
+            $offer = $this->findOffer($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -55,7 +64,11 @@ class CustomerOfferChatController extends Controller
 
     public function store(string $token, int $companyId, Request $request)
     {
-        $offer = $this->findOffer($token);
+        try {
+            $offer = $this->findOffer($token);
+        } catch (CustomerAccountRequiredException $e) {
+            return $this->loginRequiredResponse($e);
+        }
         if (! $offer) {
             return HelperFunc::sendResponse(404, 'Anfrage nicht gefunden');
         }
@@ -81,5 +94,17 @@ class CustomerOfferChatController extends Controller
     private function findOffer(string $token): ?Offer
     {
         return Offer::findByTrackIdentifier($token);
+    }
+
+    private function loginRequiredResponse(CustomerAccountRequiredException $e)
+    {
+        $loginUrl = env('CUSTOMER_LOGIN_URL')
+            ?: (rtrim(ConfigApp::query()->value('website') ?: 'https://auftragkompass.de', '/') . '/de/login');
+
+        return HelperFunc::sendResponse(403, 'Login required to track this email', [
+            'code'      => 'login_required',
+            'email'     => $e->email,
+            'login_url' => $loginUrl,
+        ]);
     }
 }

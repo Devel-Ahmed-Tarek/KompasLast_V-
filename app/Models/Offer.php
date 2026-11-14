@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\CustomerAccountRequiredException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -145,8 +146,20 @@ class Offer extends Model
             return null;
         }
 
+        $email = mb_strtolower($token);
+
+        // If this email has a customer account, email-only tracking is blocked.
+        // They must log in; secret track_token links still work above.
+        $hasCustomerAccount = User::whereRaw('LOWER(email) = ?', [$email])
+            ->where('role', 'user')
+            ->exists();
+
+        if ($hasCustomerAccount) {
+            throw new CustomerAccountRequiredException($email);
+        }
+
         $offer = $query
-            ->whereRaw('LOWER(email) = ?', [mb_strtolower($token)])
+            ->whereRaw('LOWER(email) = ?', [$email])
             ->orderByDesc('id')
             ->first();
 
