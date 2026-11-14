@@ -41,6 +41,11 @@ Route::prefix('user')->group(function () {
     Route::post('auth/set-password', [CustomerAuthController::class, 'setPassword']);
     Route::post('auth/resend-setup-otp', [CustomerAuthController::class, 'resendSetupOtp']);
     Route::post('auth/login', [CustomerAuthController::class, 'login']);
+
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::get('auth/me', [CustomerAuthController::class, 'me']);
+        Route::get('auth/my-offers', [CustomerAuthController::class, 'myOffers']);
+    });
     Route::get('aboutus', [AboutUsPageController::class, 'index']);
     Route::get('blogs', [BlogPageController::class, 'GetPageBlogs']);
     Route::get('blog/{slug}', [BlogPageController::class, 'index']);

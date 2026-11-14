@@ -264,6 +264,7 @@ class CustomerAuthController extends Controller
         }
 
         $token = $user->createToken('Customer Login Token')->plainTextToken;
+        $lang  = $this->resolveLang($request);
 
         return HelperFunc::sendResponse(200, 'Login success', [
             'token' => $token,
@@ -274,7 +275,100 @@ class CustomerAuthController extends Controller
                 'phone' => $user->phone,
                 'role'  => $user->role,
             ],
+            // Website should redirect here after login
+            'tracking_url' => $this->trackingAuthUrl($lang, $token),
         ]);
+    }
+
+    /**
+     * Current customer profile (Bearer token).
+     */
+    public function me(Request $request)
+    {
+        $user = $request->user();
+        if (! $user || $user->role !== 'user') {
+            return HelperFunc::sendResponse(403, 'Forbidden', []);
+        }
+
+        return HelperFunc::sendResponse(200, 'OK', [
+            'id'    => $user->id,
+            'name'  => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role'  => $user->role,
+        ]);
+    }
+
+    /**
+     * Offers linked to this customer (by user_id or email) for tracking portal.
+     */
+    public function myOffers(Request $request)
+    {
+        $user = $request->user();
+        if (! $user || $user->role !== 'user') {
+            return HelperFunc::sendResponse(403, 'Forbidden', []);
+        }
+
+        $offers = Offer::with('type')
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhereRaw('LOWER(email) = ?', [strtolower((string) $user->email)]);
+            })
+            ->orderByDesc('id')
+            ->get();
+
+        $lang = $this->resolveLang($request);
+        $base = rtrim($this->trackingBaseUrl(), '/');
+
+        $rows = $offers->map(function (Offer $offer) use ($base, $lang) {
+            if (! $offer->track_token) {
+                $offer->track_token = Str::random(64);
+                $offer->save();
+            }
+
+            $service = null;
+            if ($offer->type) {
+                $service = method_exists($offer->type, 'getTranslation')
+                    ? ($offer->type->getTranslation('name', $lang, false) ?: $offer->type->name)
+                    : $offer->type->name;
+                if (is_array($service)) {
+                    $service = $service[$lang] ?? $service['de'] ?? reset($service) ?: null;
+                }
+            }
+
+            return [
+                'id'              => $offer->id,
+                'name'            => $offer->name,
+                'email'           => $offer->email,
+                'service'         => $service,
+                'confirm_status'  => $offer->confirm_status,
+                'created_at'      => optional($offer->created_at)->toIso8601String(),
+                'track_token'     => $offer->track_token,
+                'track_url'       => $base . '/' . $lang . '/track/' . urlencode($offer->track_token),
+            ];
+        })->values();
+
+        $latest = $rows->first();
+
+        return HelperFunc::sendResponse(200, 'OK', [
+            'offers'            => $rows,
+            'latest_track_url'  => $latest['track_url'] ?? null,
+            'latest_track_token'=> $latest['track_token'] ?? null,
+            'total'             => $rows->count(),
+        ]);
+    }
+
+    private function trackingBaseUrl(): string
+    {
+        return rtrim(
+            env('TRACKING_APP_URL') ?: 'https://customer-tracking.auftragkompass.de',
+            '/'
+        );
+    }
+
+    private function trackingAuthUrl(string $lang, string $token): string
+    {
+        return $this->trackingBaseUrl() . '/' . $lang . '?token=' . urlencode($token);
     }
 
     private function loginUrl(Request $request): string

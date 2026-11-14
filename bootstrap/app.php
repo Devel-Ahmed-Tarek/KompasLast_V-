@@ -13,12 +13,16 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Bearer Sanctum tokens + SPA cookies for API routes
+        $middleware->api(prepend: [
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        ]);
+
         $middleware->alias([
             'typeUser'           => CheckRole::class,
             'language'           => \App\Http\Middleware\LanguageMiddleware::class,
             'check.notification' => \App\Http\Middleware\CheckAvailableNotification::class,
             'LogVisitor'         => \App\Http\Middleware\LogVisitor::class,
-            'auth:sanctum'       => \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class, // أو شوف الملاحظة تحت
         ]);
     })
 
