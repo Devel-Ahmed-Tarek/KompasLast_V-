@@ -263,8 +263,9 @@ class CustomerAuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('Customer Login Token')->plainTextToken;
-        $lang  = $this->resolveLang($request);
+        $token  = $user->createToken('Customer Login Token')->plainTextToken;
+        $lang   = $this->resolveLang($request);
+        $offers = $this->formatCustomerOffers($user, $lang);
 
         return HelperFunc::sendResponse(200, 'Login success', [
             'token' => $token,
@@ -275,8 +276,11 @@ class CustomerAuthController extends Controller
                 'phone' => $user->phone,
                 'role'  => $user->role,
             ],
-            // Website should redirect here after login
-            'tracking_url' => $this->trackingAuthUrl($lang, $token),
+            // Full offer payloads without Q&A answers
+            'offers'            => $offers,
+            'latest_track_url'  => $offers[0]['track_url'] ?? null,
+            'latest_track_token'=> $offers[0]['track_token'] ?? null,
+            'tracking_url'      => $this->trackingAuthUrl($lang, $token),
         ]);
     }
 
@@ -301,6 +305,7 @@ class CustomerAuthController extends Controller
 
     /**
      * Offers linked to this customer (by user_id or email) for tracking portal.
+     * Full offer data, without dynamic questions/answers.
      */
     public function myOffers(Request $request)
     {
@@ -309,7 +314,23 @@ class CustomerAuthController extends Controller
             return HelperFunc::sendResponse(403, 'Forbidden', []);
         }
 
-        $offers = Offer::with('type')
+        $lang   = $this->resolveLang($request);
+        $offers = $this->formatCustomerOffers($user, $lang);
+
+        return HelperFunc::sendResponse(200, 'OK', [
+            'offers'             => $offers,
+            'latest_track_url'   => $offers[0]['track_url'] ?? null,
+            'latest_track_token' => $offers[0]['track_token'] ?? null,
+            'total'              => count($offers),
+        ]);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function formatCustomerOffers(User $user, string $lang): array
+    {
+        $offers = Offer::with(['type', 'countryRelation', 'cityRelation'])
             ->where(function ($q) use ($user) {
                 $q->where('user_id', $user->id)
                     ->orWhereRaw('LOWER(email) = ?', [strtolower((string) $user->email)]);
@@ -317,45 +338,111 @@ class CustomerAuthController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $lang = $this->resolveLang($request);
         $base = rtrim($this->trackingBaseUrl(), '/');
 
-        $rows = $offers->map(function (Offer $offer) use ($base, $lang) {
+        return $offers->map(function (Offer $offer) use ($base, $lang) {
             if (! $offer->track_token) {
                 $offer->track_token = Str::random(64);
                 $offer->save();
             }
 
-            $service = null;
-            if ($offer->type) {
-                $service = method_exists($offer->type, 'getTranslation')
-                    ? ($offer->type->getTranslation('name', $lang, false) ?: $offer->type->name)
-                    : $offer->type->name;
-                if (is_array($service)) {
-                    $service = $service[$lang] ?? $service['de'] ?? reset($service) ?: null;
-                }
+            return $this->formatOfferWithoutAnswers($offer, $lang, $base);
+        })->values()->all();
+    }
+
+    /**
+     * All offer fields + type/location, explicitly without answers/questions.
+     */
+    private function formatOfferWithoutAnswers(Offer $offer, string $lang, string $trackingBase): array
+    {
+        $service = null;
+        $typePayload = null;
+        if ($offer->type) {
+            $service = method_exists($offer->type, 'getTranslation')
+                ? ($offer->type->getTranslation('name', $lang, false) ?: $offer->type->name)
+                : $offer->type->name;
+            if (is_array($service)) {
+                $service = $service[$lang] ?? $service['de'] ?? reset($service) ?: null;
             }
 
-            return [
-                'id'              => $offer->id,
-                'name'            => $offer->name,
-                'email'           => $offer->email,
-                'service'         => $service,
-                'confirm_status'  => $offer->confirm_status,
-                'created_at'      => optional($offer->created_at)->toIso8601String(),
-                'track_token'     => $offer->track_token,
-                'track_url'       => $base . '/' . $lang . '/track/' . urlencode($offer->track_token),
+            $typePayload = [
+                'id'        => $offer->type->id,
+                'name'      => $service,
+                'parent_id' => $offer->type->parent_id,
+                'price'     => $offer->type->price,
             ];
-        })->values();
+        }
 
-        $latest = $rows->first();
+        $countryName = null;
+        if ($offer->countryRelation) {
+            $countryName = method_exists($offer->countryRelation, 'getTranslation')
+                ? ($offer->countryRelation->getTranslation('name', $lang, false) ?: $offer->countryRelation->name)
+                : $offer->countryRelation->name;
+            if (is_array($countryName)) {
+                $countryName = $countryName[$lang] ?? $countryName['de'] ?? reset($countryName) ?: null;
+            }
+        }
 
-        return HelperFunc::sendResponse(200, 'OK', [
-            'offers'            => $rows,
-            'latest_track_url'  => $latest['track_url'] ?? null,
-            'latest_track_token'=> $latest['track_token'] ?? null,
-            'total'             => $rows->count(),
-        ]);
+        $cityName = null;
+        if ($offer->cityRelation) {
+            $cityName = method_exists($offer->cityRelation, 'getTranslation')
+                ? ($offer->cityRelation->getTranslation('name', $lang, false) ?: $offer->cityRelation->name)
+                : $offer->cityRelation->name;
+            if (is_array($cityName)) {
+                $cityName = $cityName[$lang] ?? $cityName['de'] ?? reset($cityName) ?: null;
+            }
+        }
+
+        return [
+            'id'                 => $offer->id,
+            'user_id'            => $offer->user_id,
+            'type_id'            => $offer->type_id,
+            'type'               => $typePayload,
+            'service'            => $service,
+            'country_id'         => $offer->country_id,
+            'city_id'            => $offer->city_id,
+            'country_name'       => $countryName,
+            'city_name'          => $cityName,
+            'latitude'           => $offer->latitude,
+            'longitude'          => $offer->longitude,
+            'name'               => $offer->name,
+            'email'              => $offer->email,
+            'phone'              => $offer->phone,
+            'date'               => $offer->date,
+            'adresse'            => $offer->adresse,
+            'ort'                => $offer->ort,
+            'zimmer'             => $offer->zimmer,
+            'etage'              => $offer->etage,
+            'vorhanden'          => $offer->vorhanden,
+            'Nach_Adresse'       => $offer->Nach_Adresse,
+            'Nach_Ort'           => $offer->Nach_Ort,
+            'Nach_Zimmer'        => $offer->Nach_Zimmer,
+            'Nach_Etage'         => $offer->Nach_Etage,
+            'Nach_vorhanden'     => $offer->Nach_vorhanden,
+            'Besonderheiten'     => $offer->Besonderheiten,
+            'count'              => $offer->count,
+            'Number_of_offers'   => $offer->Number_of_offers,
+            'cheek'              => $offer->cheek,
+            'status'             => (bool) $offer->status,
+            'confirm_status'     => $offer->confirm_status,
+            'confirmed_at'       => optional($offer->confirmed_at)->toIso8601String(),
+            'completion_status'  => $offer->completion_status,
+            'country'            => $offer->country,
+            'city'               => $offer->city,
+            'lang'               => $offer->lang,
+            'zipcode'            => $offer->zipcode,
+            'carrent_country'    => $offer->carrent_country,
+            'Nach_country'       => $offer->Nach_country,
+            'Nach_zipcode'       => $offer->Nach_zipcode,
+            'execution_date'     => $offer->execution_date,
+            'person_type'        => $offer->person_type,
+            'executed_with_us'   => $offer->executed_with_us,
+            'created_at'         => optional($offer->created_at)->toIso8601String(),
+            'updated_at'         => optional($offer->updated_at)->toIso8601String(),
+            'track_token'        => $offer->track_token,
+            'track_url'          => $trackingBase . '/' . $lang . '/track/' . urlencode((string) $offer->track_token),
+            // Explicitly NOT including: answers, questions, files, confirm_token, unit_price, ip
+        ];
     }
 
     private function trackingBaseUrl(): string

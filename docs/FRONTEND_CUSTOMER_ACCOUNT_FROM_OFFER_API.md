@@ -171,10 +171,32 @@ POST /api/user/auth/login
       "phone": "...",
       "role": "user"
     },
-    "tracking_url": "https://customer-tracking.auftragkompass.de/de?token=1%7Cxxxx"
+    "tracking_url": "https://customer-tracking.auftragkompass.de/de?token=1%7Cxxxx",
+    "offers": [
+      {
+        "id": 479,
+        "name": "Max",
+        "email": "max@example.com",
+        "phone": "...",
+        "service": "Umzug",
+        "type": { "id": 3, "name": "Umzug", "parent_id": null, "price": 50 },
+        "adresse": "...",
+        "zipcode": "44137",
+        "ort": "Dortmund",
+        "confirm_status": "confirmed",
+        "track_token": "...",
+        "track_url": "https://customer-tracking.auftragkompass.de/de/track/...",
+        "...": "كل حقول الـ offer"
+      }
+    ],
+    "latest_track_token": "...",
+    "latest_track_url": "..."
   }
 }
 ```
+
+`offers[]` = **كل بيانات الـ offer** (عنوان، مدينة، نوع خدمة، توكن تتبع، …)  
+**من غير** الأسئلة الديناميكية / الإجابات / الملفات (`answers`, `questions`, `files`).
 
 **بعد اللوجين من الـ website:** اعمل redirect على `data.tracking_url`  
 (أو ابنِ اللينك يدويًا):
