@@ -11,11 +11,30 @@ use App\Models\Shopping_list;
 use App\Models\User;
 use App\Services\OfferChatService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class AdminOfferChatController extends Controller
 {
     public function __construct(private OfferChatService $chat)
     {
+    }
+
+    /**
+     * Lightweight chat stats for admin dashboard / menu badge.
+     */
+    public function stats()
+    {
+        $total = OfferConversation::count();
+        $withMessages = OfferConversation::whereNotNull('last_message_at')->count();
+        $last24h = OfferMessage::where('created_at', '>=', now()->subDay())->count();
+
+        return HelperFunc::sendResponse(200, 'OK', [
+            'conversations_total'      => $total,
+            'conversations_with_messages' => $withMessages,
+            'messages_last_24h'        => $last24h,
+        ]);
     }
 
     /**
@@ -195,6 +214,38 @@ class AdminOfferChatController extends Controller
             'conversation' => $this->formatAdminConversation($conversation),
             'messages'     => $this->chat->messages($conversation, $afterId),
         ]);
+    }
+
+    /**
+     * Admin sends a message into an existing company↔customer conversation.
+     */
+    public function store(Request $request, int $conversationId)
+    {
+        $validator = Validator::make($request->all(), [
+            'body' => 'required|string|max:5000',
+        ]);
+
+        if ($validator->fails()) {
+            return HelperFunc::sendResponse(422, 'Validation errors', $validator->errors()->all());
+        }
+
+        $conversation = OfferConversation::find($conversationId);
+        if (! $conversation) {
+            return HelperFunc::sendResponse(404, 'Chat not found');
+        }
+
+        try {
+            $message = $this->chat->send(
+                $conversation,
+                'admin',
+                Auth::id(),
+                $request->input('body')
+            );
+        } catch (ValidationException $e) {
+            return HelperFunc::sendResponse(422, 'Validation errors', collect($e->errors())->flatten()->all());
+        }
+
+        return HelperFunc::sendResponse(201, 'Gesendet', $this->chat->formatMessage($message));
     }
 
     private function formatAdminConversation(OfferConversation $conversation): array

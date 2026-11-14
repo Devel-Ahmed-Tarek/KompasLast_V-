@@ -1,6 +1,6 @@
 # Frontend API — Admin Offer Chat (Monitoring)
 
-الأدمن يقدر **يشوف** كل الرسايل بين العميل والشركات على كل offer (Read-only، بدون إرسال).
+الأدمن يقدر **يشوف** كل الرسايل بين العميل والشركات على كل offer، وكمان **يبعت** رسالة كـ `admin` (AuftragKompass).
 
 **Base:** `/api/admin`  
 **Auth:** `Authorization: Bearer {token}` (Sanctum) + role = `admin`
@@ -224,6 +224,69 @@ GET /api/admin/chats/{conversationId}?after_id=88
 
 ---
 
+## 5) إحصائيات الشات
+
+```
+GET /api/admin/chats/stats
+```
+
+```json
+{
+  "conversations_total": 40,
+  "conversations_with_messages": 18,
+  "messages_last_24h": 7
+}
+```
+
+---
+
+## 6) إرسال رسالة من الأدمن
+
+```
+POST /api/admin/chats/{conversationId}
+```
+
+```json
+{ "body": "Wir melden uns gleich…" }
+```
+
+Success `201` — نفس شكل الرسالة، مع `sender_type: "admin"`.
+
+---
+
+## 7) Estimated quotes (قراءة)
+
+```
+GET /api/admin/estimated-quotes?offer_id=&company_id=&per_page=20
+GET /api/admin/offers/{offerId}/estimated-quotes
+```
+
+---
+
+## 8) Credit notes (إنشاء + قائمة)
+
+```
+GET  /api/admin/credit-notes?company_id=&status=all&per_page=20
+POST /api/admin/credit-notes
+GET  /api/admin/credit-notes/{id}
+```
+
+Body لإنشاء:
+
+```json
+{
+  "company_id": 108,
+  "type": "refund",
+  "amount": 25,
+  "reason": "Partial refund",
+  "offer_id": 473,
+  "status": "completed",
+  "apply_to_wallet": true
+}
+```
+
+---
+
 ## UI Flow مقترح
 
 ```
@@ -231,18 +294,20 @@ Admin Offer Details
    └── Tab: Chats
          GET /offers/{id}/chats
               │
-              ├── Company A (4 messages) → GET /offers/{id}/chats/{companyA}
-              └── Company B (0 messages) → empty state
+              ├── Company A → GET /offers/{id}/chats/{companyA}
+              │                 └── POST /chats/{conversationId} (admin reply)
+              └── Company B → empty state
 
 Admin Menu: All Chats
    └── GET /chats?q=...
          └── click row → GET /chats/{conversationId}
+                       → POST /chats/{conversationId}
 ```
 
 ---
 
 ## ملاحظات
 
-- الأدمن **مش بيقدر يبعت** رسايل من الـ API دي (مراقبة فقط).
-- لو شركة اشترت ومافيش شات لسه: `conversation_id = null` و `messages = []`.
-- `after_id` للـ polling لو حابب تحديث حي داخل شاشة التفاصيل.
+- `sender_type` صار: `customer` | `company` | `admin`.
+- لو شركة اشترت ومافيش شات لسه: `conversation_id = null` و `messages = []` — لازم الشركة/العميل يفتحوا الشات أول مرة، أو الأدمن يفتح محادثة موجودة فقط.
+- `after_id` للـ polling.

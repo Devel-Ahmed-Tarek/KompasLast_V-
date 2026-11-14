@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\Admin\AdminFaqPageController;
 use App\Http\Controllers\Api\Admin\AdminFormController;
 use App\Http\Controllers\Api\Admin\AdminImprintPageController;
 use App\Http\Controllers\Api\Admin\AdminModelOffersController;
+use App\Http\Controllers\Api\Admin\AdminCreditNoteController;
+use App\Http\Controllers\Api\Admin\AdminEstimatedQuoteController;
 use App\Http\Controllers\Api\Admin\AdminOfferChatController;
 use App\Http\Controllers\Api\Admin\AdminOfferController;
 use App\Http\Controllers\Api\Admin\AdminOfferExecutionController;
@@ -97,11 +99,22 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'typeUser:admin'])->group(fu
     Route::get('offers/{id}', [AdminOfferController::class, 'show']);
     Route::post('offers/{id}/unit-price', [AdminOfferController::class, 'updateUnitPrice']);
 
-    // Offer chat monitoring (read-only)
+    // Offer chat monitoring + admin replies
+    Route::get('chats/stats', [AdminOfferChatController::class, 'stats']);
     Route::get('chats', [AdminOfferChatController::class, 'index']);
     Route::get('chats/{conversationId}', [AdminOfferChatController::class, 'show']);
+    Route::post('chats/{conversationId}', [AdminOfferChatController::class, 'store']);
     Route::get('offers/{offerId}/chats', [AdminOfferChatController::class, 'byOffer']);
     Route::get('offers/{offerId}/chats/{companyId}', [AdminOfferChatController::class, 'byOfferCompany']);
+
+    // Estimated quotes (read)
+    Route::get('estimated-quotes', [AdminEstimatedQuoteController::class, 'index']);
+    Route::get('offers/{offerId}/estimated-quotes', [AdminEstimatedQuoteController::class, 'byOffer']);
+
+    // Credit notes (admin creates / lists)
+    Route::get('credit-notes', [AdminCreditNoteController::class, 'index']);
+    Route::post('credit-notes', [AdminCreditNoteController::class, 'store']);
+    Route::get('credit-notes/{id}', [AdminCreditNoteController::class, 'show']);
 
     // Contacts management
     Route::get('contact', [AdminContactController::class, 'index']);

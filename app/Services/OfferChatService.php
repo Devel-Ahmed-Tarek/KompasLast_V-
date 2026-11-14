@@ -201,7 +201,7 @@ class OfferChatService
         $conversation->last_message_at = now();
         if ($senderType === 'customer') {
             $conversation->customer_last_read_at = now();
-        } else {
+        } elseif ($senderType === 'company') {
             $conversation->company_last_read_at = now();
         }
         $conversation->save();
@@ -258,6 +258,21 @@ class OfferChatService
                         'ar' => 'رسالة جديدة من العميل: ' . $preview,
                         'fr' => 'Nouveau message client: ' . $preview,
                         'it' => 'Nuovo messaggio del cliente: ' . $preview,
+                    ]
+                );
+            }
+
+            if ($senderType === 'admin' && $conversation->company) {
+                HelperFunc::sendMultilangNotification(
+                    collect([$conversation->company]),
+                    'offer_chat_message',
+                    $conversation->offer_id,
+                    [
+                        'en' => 'New message from AuftragKompass: ' . $preview,
+                        'de' => 'Neue Nachricht von AuftragKompass: ' . $preview,
+                        'ar' => 'رسالة جديدة من AuftragKompass: ' . $preview,
+                        'fr' => 'Nouveau message de AuftragKompass: ' . $preview,
+                        'it' => 'Nuovo messaggio da AuftragKompass: ' . $preview,
                     ]
                 );
             }
