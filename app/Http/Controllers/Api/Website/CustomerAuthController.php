@@ -263,9 +263,9 @@ class CustomerAuthController extends Controller
             ]);
         }
 
-        $token  = $user->createToken('Customer Login Token')->plainTextToken;
-        $lang   = $this->resolveLang($request);
-        $offers = $this->formatCustomerOffers($user, $lang);
+        $token = $user->createToken('Customer Login Token')->plainTextToken;
+        $lang  = $this->resolveLang($request);
+        $offer = $this->formatLatestCustomerOffer($user, $lang);
 
         return HelperFunc::sendResponse(200, 'Login success', [
             'token' => $token,
@@ -276,10 +276,10 @@ class CustomerAuthController extends Controller
                 'phone' => $user->phone,
                 'role'  => $user->role,
             ],
-            // Full offer payloads without Q&A answers
-            'offers'            => $offers,
-            'latest_track_url'  => $offers[0]['track_url'] ?? null,
-            'latest_track_token'=> $offers[0]['track_token'] ?? null,
+            // Latest offer only — full fields, without Q&A answers
+            'offer'             => $offer,
+            'latest_track_url'  => $offer['track_url'] ?? null,
+            'latest_track_token'=> $offer['track_token'] ?? null,
             'tracking_url'      => $this->trackingAuthUrl($lang, $token),
         ]);
     }
@@ -330,24 +330,52 @@ class CustomerAuthController extends Controller
      */
     private function formatCustomerOffers(User $user, string $lang): array
     {
-        $offers = Offer::with(['type', 'countryRelation', 'cityRelation'])
-            ->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)
-                    ->orWhereRaw('LOWER(email) = ?', [strtolower((string) $user->email)]);
-            })
+        $offers = $this->customerOffersQuery($user)
             ->orderByDesc('id')
             ->get();
 
         $base = rtrim($this->trackingBaseUrl(), '/');
 
         return $offers->map(function (Offer $offer) use ($base, $lang) {
-            if (! $offer->track_token) {
-                $offer->track_token = Str::random(64);
-                $offer->save();
-            }
-
-            return $this->formatOfferWithoutAnswers($offer, $lang, $base);
+            return $this->ensureTrackTokenAndFormat($offer, $lang, $base);
         })->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function formatLatestCustomerOffer(User $user, string $lang): ?array
+    {
+        $offer = $this->customerOffersQuery($user)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $offer) {
+            return null;
+        }
+
+        $base = rtrim($this->trackingBaseUrl(), '/');
+
+        return $this->ensureTrackTokenAndFormat($offer, $lang, $base);
+    }
+
+    private function customerOffersQuery(User $user)
+    {
+        return Offer::with(['type', 'countryRelation', 'cityRelation'])
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhereRaw('LOWER(email) = ?', [strtolower((string) $user->email)]);
+            });
+    }
+
+    private function ensureTrackTokenAndFormat(Offer $offer, string $lang, string $base): array
+    {
+        if (! $offer->track_token) {
+            $offer->track_token = Str::random(64);
+            $offer->save();
+        }
+
+        return $this->formatOfferWithoutAnswers($offer, $lang, $base);
     }
 
     /**
