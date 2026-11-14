@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Website\HomePageController;
 use App\Http\Controllers\Api\Website\ImprintPageController;
 use App\Http\Controllers\Api\Website\ModelOffersController;
 use App\Http\Controllers\Api\Website\NavAndFotterController;
+use App\Http\Controllers\Api\Website\CustomerAuthController;
 use App\Http\Controllers\Api\Website\CustomerOfferChatController;
 use App\Http\Controllers\Api\Website\CustomerOfferTrackController;
 use App\Http\Controllers\Api\Website\OfferExecutionController;
@@ -34,6 +35,12 @@ Route::prefix('user')->group(function () {
     Route::get('check-config', [HomePageController::class, 'checkConfig']);
     Route::get('branding', [HomePageController::class, 'branding']);
     Route::get('offers/confirm/{token}', [HomePageController::class, 'confirmOffer']);
+
+    // Customer account from offer (popup → create → email OTP → set password → login)
+    Route::post('auth/create-from-offer', [CustomerAuthController::class, 'createFromOffer']);
+    Route::post('auth/set-password', [CustomerAuthController::class, 'setPassword']);
+    Route::post('auth/resend-setup-otp', [CustomerAuthController::class, 'resendSetupOtp']);
+    Route::post('auth/login', [CustomerAuthController::class, 'login']);
     Route::get('aboutus', [AboutUsPageController::class, 'index']);
     Route::get('blogs', [BlogPageController::class, 'GetPageBlogs']);
     Route::get('blog/{slug}', [BlogPageController::class, 'index']);

@@ -20,8 +20,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'img',   // Add img to fillable
-        'phone', // Add phone to fillable
+        'img',
+        'phone',
+        'role',
+        'ban',
+        'status',
+        'otp',
+        'otp_expired_at',
+        'email_verified_at',
     ];
 
     /**
