@@ -382,16 +382,24 @@ class CompanyProfileController extends Controller
             return HelperFunc::sendResponse(404, 'User not found', []);
         }
 
-        $user->typesComapny()->attach($request->type_id);
-        $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
-
-        $type = type::find($request->type_id);
+        $type = Type::find($request->type_id);
         if (! $type) {
             return HelperFunc::sendResponse(404, 'Type not found', []);
         }
+
+        if ($user->typesComapny()->where('types.id', $request->type_id)->exists()) {
+            return HelperFunc::sendResponse(200, 'Type already added', []);
+        }
+
+        $user->typesComapny()->attach($request->type_id);
+        $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
+
+        $nameEn = $type->getTranslation('name', 'en', false) ?: (string) $type->name;
+        $nameDe = $type->getTranslation('name', 'de', false) ?: (string) $type->name;
+
         HelperFunc::sendMultilangNotification($admins, "type", $user->id, [
-            'en' => 'New type added : ' . $type->name['en'],
-            'de' => 'Neuer Typ hinzugefügt : ' . $type->name['de'],
+            'en' => 'New type added : ' . $nameEn,
+            'de' => 'Neuer Typ hinzugefügt : ' . $nameDe,
         ]);
 
         return HelperFunc::sendResponse(200, 'Type added successfully', []);
@@ -507,9 +515,11 @@ class CompanyProfileController extends Controller
         $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
         $country = Country::find($request->country_id);
         if ($country) {
+            $nameEn = $country->getTranslation('name', 'en', false) ?: (string) $country->name;
+            $nameDe = $country->getTranslation('name', 'de', false) ?: (string) $country->name;
             HelperFunc::sendMultilangNotification($admins, "country_added", $user->id, [
-                'en' => 'New country added: ' . ($country->name['en'] ?? ''),
-                'de' => 'Neues Land hinzugefügt: ' . ($country->name['de'] ?? ''),
+                'en' => 'New country added: ' . $nameEn,
+                'de' => 'Neues Land hinzugefügt: ' . $nameDe,
             ]);
         }
 
