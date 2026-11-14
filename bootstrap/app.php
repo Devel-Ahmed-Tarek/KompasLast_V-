@@ -13,11 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Bearer Sanctum tokens + SPA cookies for API routes
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
-
+        // API uses Bearer tokens only (no stateful Sanctum / CSRF on /api/*).
         $middleware->alias([
             'typeUser'           => CheckRole::class,
             'language'           => \App\Http\Middleware\LanguageMiddleware::class,
