@@ -2,9 +2,14 @@
 
 use App\Http\Controllers\Api\Admin\ConfigAppController;
 use App\Http\Controllers\Api\Company\CompanyAuthController;
+use App\Http\Controllers\Api\Company\CompanyCreditNoteController;
 use App\Http\Controllers\Api\Company\CompanyDachbouredController;
+use App\Http\Controllers\Api\Company\CompanyEstimatedQuoteController;
+use App\Http\Controllers\Api\Company\CompanyFinanceController;
+use App\Http\Controllers\Api\Company\CompanyInvoiceController;
 use App\Http\Controllers\Api\Company\CompanyOfferChatController;
 use App\Http\Controllers\Api\Company\CompanyOrderController;
+use App\Http\Controllers\Api\Company\CompanyPaymentMethodController;
 use App\Http\Controllers\Api\Company\CompanyProfileController;
 use App\Http\Controllers\Api\Company\OfferController;
 use App\Http\Controllers\Api\Company\OfferFakeReportController;
@@ -83,6 +88,19 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     Route::get('chats/{conversationId}', [CompanyOfferChatController::class, 'show']);
     Route::post('chats/{conversationId}', [CompanyOfferChatController::class, 'store']);
 
+    // Estimated quote (private cost estimate to customer + chat message)
+    Route::post('offers/estimated-quote', [CompanyEstimatedQuoteController::class, 'store']);
+    Route::get('offers/{offerId}/estimated-quote', [CompanyEstimatedQuoteController::class, 'show']);
+    Route::post('offers/{offerId}/estimated-quote', [CompanyEstimatedQuoteController::class, 'store']);
+
+    // Finances
+    Route::get('finances/overview', [CompanyFinanceController::class, 'overview']);
+    Route::get('invoices', [CompanyInvoiceController::class, 'index']);
+    Route::get('invoices/{id}', [CompanyInvoiceController::class, 'show']);
+    Route::get('invoices/{id}/pdf', [CompanyInvoiceController::class, 'pdf']);
+    Route::get('credit-notes', [CompanyCreditNoteController::class, 'index']);
+    Route::get('payment-methods', [CompanyPaymentMethodController::class, 'index']);
+
     Route::get('/{id}/profile', [CompanyProfileController::class, 'show']);
     Route::put('/{status}/profile', [CompanyProfileController::class, 'updateDinamicOfferCompany']);
     Route::post('/{id}/profile', [CompanyProfileController::class, 'update']);
@@ -99,6 +117,7 @@ Route::prefix('company')->middleware(['auth:sanctum', 'typeUser:company'])->grou
     Route::post('/send-email-to-kompas', [EmailController::class, 'sendEmailToCompany']);
 
     // company Notification
+    Route::get('notifications/unread-count', [NotificationsController::class, 'unreadCount']);
     Route::get('notifications/{limt}/{filter}', [NotificationsController::class, 'index']);
     Route::put('notifications/read/all', [NotificationsController::class, 'markAllAsRead']);
     Route::get('notifications/unreading', [NotificationsController::class, 'getAllUnreadNotifications']);

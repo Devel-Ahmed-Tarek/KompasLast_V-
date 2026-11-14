@@ -8,6 +8,18 @@ use Illuminate\Support\Facades\Auth;
 
 class NotificationsController extends Controller
 {
+    public function unreadCount()
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return HelperFunc::sendResponse(401, 'Unauthorized', []);
+        }
+
+        return HelperFunc::sendResponse(200, 'OK', [
+            'unread_total' => $user->unreadNotifications()->count(),
+        ]);
+    }
+
     public function index(Request $request, $limit = 10, $filter = 'all')
     {
         $user   = Auth::user();
