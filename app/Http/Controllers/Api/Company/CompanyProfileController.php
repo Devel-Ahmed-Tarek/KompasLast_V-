@@ -662,9 +662,11 @@ class CompanyProfileController extends Controller
         ]);
 
         $admins = User::query()->where('role', 'admin')->where("available_notification", '1')->get();
+        $nameEn = $city->getTranslation('name', 'en', false) ?: (string) $city->name;
+        $nameDe = $city->getTranslation('name', 'de', false) ?: (string) $city->name;
         HelperFunc::sendMultilangNotification($admins, "city_added", $user->id, [
-            'en' => 'New city added: ' . ($city->name['en'] ?? ''),
-            'de' => 'Neue Stadt hinzugefügt: ' . ($city->name['de'] ?? ''),
+            'en' => 'New city added: ' . $nameEn,
+            'de' => 'Neue Stadt hinzugefügt: ' . $nameDe,
         ]);
 
         return HelperFunc::sendResponse(200, 'City added successfully', [
